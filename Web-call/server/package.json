@@ -1,0 +1,16 @@
+{
+  "name": "facelink-signaling-server",
+  "version": "1.0.0",
+  "description": "FaceLink 视频通话信令服务器 - 基于 PeerJS Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "peer": "^1.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

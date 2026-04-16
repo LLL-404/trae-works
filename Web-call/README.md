@@ -41,9 +41,46 @@ python3 -m http.server 8080
 ```
 ├── video-call.html          # 主应用（单文件，约 1200 行）
 ├── README.md                # 项目说明
+├── server/                  # 自建信令服务器代码
+│   ├── package.json
+│   ├── server.js
+│   └── .gitignore
 └── FaceLink-SOLO挑战赛参赛作品.docx  # 参赛帖子文档
 ```
 
 ## 📜 License
 
 MIT
+
+---
+
+## 🚀 自建信令服务器部署（推荐国内用户）
+
+PeerJS 公共服务器在海外，国内连接不稳定。建议部署自己的信令服务器到 Render.com（免费、国内可直连）。
+
+### 部署步骤
+
+1. **注册 Render.com 账号**
+   - 访问 https://render.com 注册（支持 GitHub 登录）
+
+2. **创建 GitHub 仓库**
+   - 将 `server/` 文件夹推送到 GitHub
+
+3. **在 Render.com 创建 Web 服务**
+   - 点击 "New" → "Web Service"
+   - 连接你的 GitHub 仓库
+   - 选择 `server/` 目录
+   - Render 会自动检测 `package.json` 并部署
+
+4. **获取服务器地址**
+   - 部署完成后，Render 会给你一个地址，如 `https://facelink-server.onrender.com`
+
+5. **修改前端配置**
+   - 打开 `video-call.html`
+   - 找到 `const CUSTOM_PEER_SERVER = '';`
+   - 填入你的服务器地址：`const CUSTOM_PEER_SERVER = 'https://facelink-server.onrender.com';`
+
+### 注意事项
+- Render 免费套餐会在 15 分钟无流量后休眠，首次唤醒约需 30-60 秒
+- WebSocket 长连接会保持服务活跃，通话期间不会休眠
+- 建议绑定自定义域名以获得更好的稳定性

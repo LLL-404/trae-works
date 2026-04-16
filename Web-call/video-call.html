@@ -4,27 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FaceLink · 视频通话与会议</title>
+    <!-- PeerJS 库：用于 WebRTC 点对点连接的信令服务器 -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- MQTT.js 库：备用信令通道，当 PeerJS 信令服务器不可用时自动切换 -->
+    <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
+    <!-- Google Fonts：Outfit 用于英文/品牌字体，Noto Sans SC 用于中文界面 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
+        /* 全局重置：清除默认边距和内边距，使用 border-box 盒模型 */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* CSS 变量定义：统一管理全局颜色、圆角等设计令牌 */
         :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #111827;
-            --bg-card: rgba(17, 24, 39, 0.7);
-            --accent: #00e5a0;
-            --accent-dim: rgba(0, 229, 160, 0.15);
-            --accent-glow: rgba(0, 229, 160, 0.4);
-            --text-primary: #f0f4f8;
-            --text-secondary: #8899aa;
-            --text-muted: #4a5568;
-            --danger: #ff4757;
-            --warning: #ffa502;
-            --border: rgba(255, 255, 255, 0.06);
-            --radius: 16px;
-            --radius-sm: 10px;
+            --bg-primary: #0a0e17;       // 主背景色（深蓝黑）
+            --bg-secondary: #111827;     // 次要背景色（卡片、面板）
+            --bg-card: rgba(17, 24, 39, 0.7);  // 半透明卡片背景
+            --accent: #00e5a0;           // 主题强调色（青绿）
+            --accent-dim: rgba(0, 229, 160, 0.15);   // 强调色淡化版
+            --accent-glow: rgba(0, 229, 160, 0.4);   // 强调色发光效果
+            --text-primary: #f0f4f8;     // 主文字颜色
+            --text-secondary: #8899aa;   // 次要文字颜色
+            --text-muted: #4a5568;       // 弱化文字颜色
+            --danger: #ff4757;           // 危险/错误色（红色）
+            --warning: #ffa502;          // 警告色（橙色）
+            --border: rgba(255, 255, 255, 0.06);  // 边框颜色（微透明）
+            --radius: 16px;              // 大圆角
+            --radius-sm: 10px;           // 小圆角
         }
+
+        /* 页面根元素样式：全高、字体、背景色、禁止滚动 */
         html, body {
             height: 100%;
             font-family: 'Noto Sans SC', 'Outfit', sans-serif;
@@ -33,23 +42,28 @@
             overflow: hidden;
         }
 
-        /* ===== 背景 ===== */
+        /* ===== 背景氛围层 ===== */
+        /* 背景光晕容器：固定定位，覆盖整个视口，不响应鼠标事件 */
         .bg-atmosphere { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        /* 右上角青绿色光晕，带浮动动画 */
         .bg-atmosphere::before {
             content: ''; position: absolute; width: 600px; height: 600px; top: -200px; right: -100px;
             background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, transparent 70%);
             animation: floatBlob 20s ease-in-out infinite;
         }
+        /* 左下角蓝色光晕，反向浮动动画 */
         .bg-atmosphere::after {
             content: ''; position: absolute; width: 500px; height: 500px; bottom: -150px; left: -100px;
             background: radial-gradient(circle, rgba(0,150,255,0.06) 0%, transparent 70%);
             animation: floatBlob 25s ease-in-out infinite reverse;
         }
+        /* 光晕浮动关键帧：平移 + 缩放组合动画 */
         @keyframes floatBlob {
             0%, 100% { transform: translate(0, 0) scale(1); }
             33% { transform: translate(30px, -40px) scale(1.1); }
             66% { transform: translate(-20px, 20px) scale(0.95); }
         }
+        /* 背景网格：微透明网格线，增加科技感 */
         .bg-grid {
             position: fixed; inset: 0; z-index: 0;
             background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
@@ -57,59 +71,79 @@
             background-size: 60px 60px; pointer-events: none;
         }
 
-        /* ===== 布局 ===== */
+        /* ===== 应用主布局 ===== */
+        /* 应用容器：纵向弹性布局，占满整个视口高度 */
         .app { position: relative; z-index: 1; height: 100vh; display: flex; flex-direction: column; }
 
         /* ===== 顶栏 ===== */
+        /* 顶部导航栏：毛玻璃效果，包含 Logo 和状态信息 */
         .topbar {
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 20px;
             backdrop-filter: blur(20px); background: rgba(10, 14, 23, 0.6);
             border-bottom: 1px solid var(--border);
         }
+        /* Logo 样式：图标 + 品牌名称 */
         .logo { display: flex; align-items: center; gap: 10px; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.15rem; letter-spacing: -0.5px; }
+        /* Logo 图标：渐变背景圆角方块 */
         .logo-icon {
             width: 34px; height: 34px; border-radius: 9px;
             background: linear-gradient(135deg, var(--accent), #00b4d8);
             display: flex; align-items: center; justify-content: center; font-size: 1rem;
         }
+        /* 顶栏右侧区域：状态徽章容器 */
         .topbar-right { display: flex; align-items: center; gap: 10px; }
+        /* 连接状态徽章：显示连接状态圆点 + 文字 */
         .status-badge {
             display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary);
             padding: 5px 12px; border-radius: 20px; background: var(--bg-card); border: 1px solid var(--border);
         }
+        /* 状态圆点：默认灰色，根据状态切换颜色 */
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); transition: background 0.3s; }
+        /* 已连接状态：绿色发光 */
         .status-dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+        /* 等待连接状态：橙色脉冲动画 */
         .status-dot.waiting { background: var(--warning); animation: pulse 2s infinite; }
+        /* 脉冲动画关键帧 */
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+        /* 参会者数量徽章：会议中显示当前参会人数 */
         .participants-badge {
             display: none; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--accent);
             padding: 5px 12px; border-radius: 20px; background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.2);
         }
         .participants-badge.visible { display: flex; }
+        /* 主持人徽章：仅主持人可见 */
         .host-badge {
             display: none; font-size: 0.7rem; color: var(--warning); padding: 3px 8px; border-radius: 10px;
             background: rgba(255,165,2,0.12); border: 1px solid rgba(255,165,2,0.25);
         }
         .host-badge.visible { display: inline-flex; align-items: center; gap: 3px; }
 
-        /* ===== 主区域 ===== */
+        /* ===== 主内容区域 ===== */
+        /* 主区域：弹性居中布局，承载着陆页/分享面板/会议视图 */
         .main-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; position: relative; overflow: hidden; }
 
         /* ===== 着陆页 ===== */
+        /* 着陆页容器：纵向排列，带入场动画 */
         .landing { display: flex; flex-direction: column; align-items: center; gap: 28px; max-width: 560px; width: 100%; animation: fadeUp 0.8s ease-out; }
+        /* 入场动画：从下方淡入上移 */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        /* 着陆页标题区域 */
         .landing-hero { text-align: center; }
+        /* 主标题：渐变文字效果 */
         .landing-hero h1 {
             font-family: 'Outfit', sans-serif; font-size: 2.6rem; font-weight: 700;
             letter-spacing: -1.5px; line-height: 1.15; margin-bottom: 12px;
             background: linear-gradient(135deg, var(--text-primary) 40%, var(--accent));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
+        /* 副标题描述文字 */
         .landing-hero p { color: var(--text-secondary); font-size: 1rem; line-height: 1.6; }
 
+        /* 模式选择器：私密通话 / 多人会议 两个选项卡 */
         .mode-selector { display: flex; gap: 12px; width: 100%; }
+        /* 模式卡片：可点击选择，选中时高亮边框 */
         .mode-card {
             flex: 1; padding: 20px 16px; border-radius: var(--radius); background: var(--bg-card);
             border: 2px solid var(--border); backdrop-filter: blur(12px); cursor: pointer;
@@ -117,109 +151,140 @@
         }
         .mode-card:hover { border-color: rgba(0,229,160,0.3); background: var(--accent-dim); transform: translateY(-2px); }
         .mode-card.selected { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 4px 20px rgba(0,229,160,0.1); }
+        /* 模式卡片图标 */
         .mode-card-icon { font-size: 2rem; margin-bottom: 8px; line-height: 1; }
+        /* 模式卡片标题和描述 */
         .mode-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
         .mode-card p { font-size: 0.75rem; color: var(--text-secondary); }
 
+        /* 操作卡片网格：创建房间、输入房间号、粘贴链接加入 */
         .action-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+        /* 操作卡片：通用样式 */
         .action-card {
             padding: 20px 16px; border-radius: var(--radius); background: var(--bg-card);
             border: 1px solid var(--border); backdrop-filter: blur(12px); cursor: pointer;
             transition: all 0.3s ease; text-align: center;
         }
         .action-card:hover { border-color: var(--accent); background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,229,160,0.1); }
+        /* 主要操作卡片（创建房间）：跨两列，渐变背景突出显示 */
         .action-card.primary {
             grid-column: 1 / -1; padding: 24px;
             background: linear-gradient(135deg, rgba(0,229,160,0.12), rgba(0,180,216,0.08));
             border-color: rgba(0, 229, 160, 0.2);
         }
         .action-card.primary:hover { border-color: var(--accent); box-shadow: 0 8px 40px rgba(0, 229, 160, 0.15); }
+        /* 操作卡片图标 */
         .action-card-icon { font-size: 1.8rem; margin-bottom: 8px; line-height: 1; }
+        /* 操作卡片标题和描述 */
         .action-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 3px; }
         .action-card p { font-size: 0.78rem; color: var(--text-secondary); }
 
         /* ===== 分享面板 ===== */
+        /* 分享面板：创建房间后显示，用于分享房间链接 */
         .share-panel { display: none; flex-direction: column; align-items: center; gap: 18px; max-width: 520px; width: 100%; animation: fadeUp 0.5s ease-out; }
         .share-panel.visible { display: flex; }
+        /* 分享面板标题 */
         .share-panel h2 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 600; text-align: center; }
+        /* 分享链接输入框：只读，带复制按钮 */
         .share-box {
             width: 100%; padding: 14px 16px; border-radius: var(--radius-sm);
             background: var(--bg-secondary); border: 1px solid var(--border);
             display: flex; align-items: center; gap: 10px;
         }
+        /* 链接输入框内的文本 */
         .share-box input { flex: 1; background: none; border: none; color: var(--accent); font-size: 0.82rem; font-family: 'Outfit', monospace; outline: none; }
+        /* 复制按钮 */
         .share-box button {
             padding: 7px 16px; border: none; border-radius: 8px; background: var(--accent);
             color: var(--bg-primary); font-weight: 600; font-size: 0.82rem; cursor: pointer;
             transition: all 0.2s; white-space: nowrap;
         }
         .share-box button:hover { opacity: 0.85; }
+        /* 复制成功状态 */
         .share-box button.copied { background: var(--text-secondary); }
+        /* 房间信息行：显示房间号 */
         .room-info { display: flex; align-items: center; gap: 16px; color: var(--text-muted); font-size: 0.82rem; }
         .room-info span:first-child { color: var(--text-secondary); }
+        /* 房间号：强调色等宽字体 */
         .room-info .room-id { color: var(--accent); font-family: 'Outfit', monospace; font-weight: 600; font-size: 1.05rem; letter-spacing: 2px; }
+        /* 等待连接指示器：跳动圆点 + 文字 */
         .waiting-indicator { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 0.88rem; }
+        /* 等待动画圆点 */
         .waiting-dots span {
             display: inline-block; width: 6px; height: 6px; border-radius: 50%;
             background: var(--accent); margin: 0 2px; animation: bounce 1.4s ease-in-out infinite;
         }
         .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
         .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+        /* 圆点弹跳动画 */
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 
         /* ===== 会议视图 ===== */
+        /* 会议视图容器：占满主区域，默认隐藏 */
         .meeting-view { display: none; width: 100%; height: 100%; position: relative; animation: fadeIn 0.5s ease; }
         .meeting-view.visible { display: flex; flex-direction: column; }
+        /* 淡入动画 */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* 视频网格 */
+        /* 视频网格：根据参会人数自适应布局 */
         .video-grid {
             flex: 1; display: grid; gap: 8px; padding: 8px;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             grid-template-rows: repeat(auto-fit, minmax(200px, 1fr));
             align-content: center; overflow: hidden;
         }
+        /* 不同人数的网格布局 */
         .video-grid.grid-1 { grid-template-columns: 1fr; }
         .video-grid.grid-2 { grid-template-columns: repeat(2, 1fr); }
         .video-grid.grid-3 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
         .video-grid.grid-4 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
         .video-grid.grid-5, .video-grid.grid-6 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
 
+        /* 视频卡片：单个参会者的视频画面 */
         .video-tile {
             position: relative; border-radius: var(--radius); overflow: hidden;
             background: var(--bg-secondary); border: 2px solid transparent;
             transition: border-color 0.3s;
         }
+        /* 正在说话时的高亮边框 */
         .video-tile.speaking { border-color: var(--accent); }
+        /* 视频元素：铺满卡片，保持比例裁剪 */
         .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+        /* 本地视频：水平镜像翻转 */
         .video-tile.local-tile video { transform: scaleX(-1); }
+        /* 视频占位符：无视频流时显示头像和名称 */
         .video-tile-placeholder {
             position: absolute; inset: 0; display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 10px; color: var(--text-muted);
         }
+        /* 占位符头像 */
         .video-tile-placeholder .avatar {
             width: 64px; height: 64px; border-radius: 50%;
             background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
             border: 2px solid var(--border);
             display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
         }
+        /* 占位符名称文字 */
         .video-tile-placeholder p { font-size: 0.82rem; }
+        /* 视频卡片底部标签：显示参会者名称 */
         .tile-label {
             position: absolute; bottom: 8px; left: 10px; display: flex; align-items: center; gap: 6px;
             font-size: 0.75rem; color: white; background: rgba(0,0,0,0.55); padding: 3px 10px; border-radius: 6px;
             backdrop-filter: blur(4px);
         }
+        /* 主持人标签 */
         .tile-label .host-tag {
             font-size: 0.65rem; color: var(--warning); background: rgba(255,165,2,0.2);
             padding: 1px 5px; border-radius: 4px;
         }
+        /* 麦克风关闭图标：显示在视频卡片右上角 */
         .tile-mic-off {
             position: absolute; top: 10px; right: 10px; width: 28px; height: 28px;
             border-radius: 50%; background: rgba(255,71,87,0.8); display: flex;
             align-items: center; justify-content: center; font-size: 0.8rem;
         }
 
-        /* 通话计时器 */
+        /* 通话计时器：显示在会议视图顶部居中 */
         .call-timer {
             position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
             padding: 6px 16px; border-radius: 20px; background: rgba(0,0,0,0.5);
@@ -228,21 +293,25 @@
         }
         .call-timer.visible { display: block; }
 
-        /* 连接中覆盖层 */
+        /* 连接中覆盖层：全屏遮罩，显示加载动画 */
         .connecting-overlay {
             display: none; position: absolute; inset: 0; background: rgba(10, 14, 23, 0.85);
             backdrop-filter: blur(8px); z-index: 20; flex-direction: column;
             align-items: center; justify-content: center; gap: 18px;
         }
         .connecting-overlay.visible { display: flex; }
+        /* 加载旋转动画 */
         .connecting-spinner {
             width: 44px; height: 44px; border: 3px solid var(--border);
             border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite;
         }
+        /* 旋转动画关键帧 */
         @keyframes spin { to { transform: rotate(360deg); } }
+        /* 连接提示文字 */
         .connecting-overlay p { color: var(--text-secondary); font-size: 0.92rem; }
 
-        /* ===== 参会者面板 ===== */
+        /* ===== 参会者侧边栏 ===== */
+        /* 侧边栏：右侧滑出面板，显示参会者列表 */
         .sidebar {
             display: none; position: absolute; top: 0; right: 0; width: 280px; height: 100%;
             background: rgba(10, 14, 23, 0.92); backdrop-filter: blur(20px);
@@ -250,35 +319,47 @@
             flex-direction: column; animation: slideInRight 0.3s ease;
         }
         .sidebar.visible { display: flex; }
+        /* 侧边栏滑入动画 */
         @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        /* 侧边栏头部：标题 + 关闭按钮 */
         .sidebar-header {
             display: flex; align-items: center; justify-content: space-between;
             padding: 16px; border-bottom: 1px solid var(--border);
         }
         .sidebar-header h3 { font-size: 0.95rem; font-weight: 600; }
+        /* 侧边栏关闭按钮 */
         .sidebar-close {
             width: 30px; height: 30px; border: none; border-radius: 8px;
             background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
             display: flex; align-items: center; justify-content: center; font-size: 1rem;
         }
         .sidebar-close:hover { background: rgba(255,255,255,0.1); }
+        /* 参会者列表容器：可滚动 */
         .participant-list { flex: 1; overflow-y: auto; padding: 8px; }
+        /* 单个参会者条目 */
         .participant-item {
             display: flex; align-items: center; gap: 10px; padding: 10px 12px;
             border-radius: var(--radius-sm); transition: background 0.2s;
         }
         .participant-item:hover { background: rgba(255,255,255,0.04); }
+        /* 参会者头像 */
         .participant-avatar {
             width: 36px; height: 36px; border-radius: 50%;
             background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
             border: 1px solid var(--border);
             display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0;
         }
+        /* 参会者信息区域 */
         .participant-info { flex: 1; min-width: 0; }
+        /* 参会者名称 */
         .participant-name { font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+        /* 主持人标签 */
         .participant-name .host-tag { font-size: 0.6rem; color: var(--warning); background: rgba(255,165,2,0.15); padding: 1px 5px; border-radius: 3px; }
+        /* 参会者状态（麦克风/摄像头开关状态） */
         .participant-status { font-size: 0.72rem; color: var(--text-muted); }
+        /* 参会者操作按钮组 */
         .participant-actions { display: flex; gap: 4px; }
+        /* 操作按钮（静音请求、移出等） */
         .participant-actions button {
             width: 28px; height: 28px; border: none; border-radius: 6px;
             background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
@@ -286,27 +367,34 @@
             transition: all 0.2s;
         }
         .participant-actions button:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        /* 危险操作按钮（移出参会者）：悬停变红 */
         .participant-actions button.danger:hover { background: rgba(255,71,87,0.2); color: var(--danger); }
 
-        /* ===== 控制栏 ===== */
+        /* ===== 底部控制栏 ===== */
+        /* 控制栏：会议中的操作按钮（麦克风、摄像头、参会者、挂断） */
         .controls {
             display: none; align-items: center; justify-content: center; gap: 12px;
             padding: 14px 20px; backdrop-filter: blur(20px); background: rgba(10, 14, 23, 0.7);
             border-top: 1px solid var(--border);
         }
         .controls.visible { display: flex; }
+        /* 控制按钮：圆形按钮，带悬浮提示 */
         .ctrl-btn {
             width: 52px; height: 52px; border-radius: 50%; border: none;
             display: flex; align-items: center; justify-content: center;
             font-size: 1.2rem; cursor: pointer; transition: all 0.2s ease; position: relative;
         }
+        /* 默认样式控制按钮 */
         .ctrl-btn.default {
             background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border);
         }
         .ctrl-btn.default:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
+        /* 激活状态（麦克风/摄像头开启时） */
         .ctrl-btn.default.active { background: rgba(255,255,255,0.15); color: var(--accent); border-color: var(--accent); }
+        /* 挂断按钮：红色，稍大 */
         .ctrl-btn.end { background: var(--danger); color: white; width: 58px; height: 58px; font-size: 1.4rem; }
         .ctrl-btn.end:hover { background: #e84057; transform: scale(1.08); box-shadow: 0 4px 20px rgba(255, 71, 87, 0.4); }
+        /* 悬浮提示文字 */
         .ctrl-btn .tooltip {
             position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
             padding: 4px 10px; border-radius: 6px; background: rgba(0,0,0,0.8);
@@ -315,46 +403,59 @@
         }
         .ctrl-btn:hover .tooltip { opacity: 1; }
 
-        /* ===== Toast ===== */
+        /* ===== Toast 消息提示 ===== */
+        /* Toast 容器：固定在右上角，纵向排列 */
         .toast-container { position: fixed; top: 70px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        /* 单条 Toast 消息：带入场和退场动画 */
         .toast {
             padding: 10px 18px; border-radius: var(--radius-sm); background: var(--bg-card);
             border: 1px solid var(--border); backdrop-filter: blur(12px); color: var(--text-primary);
             font-size: 0.82rem; animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards; max-width: 300px;
         }
+        /* 成功类型 Toast：绿色边框 */
         .toast.success { border-color: var(--accent); }
+        /* 错误类型 Toast：红色边框 */
         .toast.error { border-color: var(--danger); }
+        /* Toast 滑入动画 */
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        /* Toast 淡出动画 */
         @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
 
-        /* ===== 响应式 ===== */
+        /* ===== 响应式适配 ===== */
+        /* 移动端（屏幕宽度 <= 600px）样式调整 */
         @media (max-width: 600px) {
-            .landing-hero h1 { font-size: 1.8rem; }
-            .mode-selector { flex-direction: column; }
-            .action-cards { grid-template-columns: 1fr; }
-            .video-grid { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
-            .sidebar { width: 100%; }
-            .ctrl-btn { width: 46px; height: 46px; font-size: 1rem; }
-            .ctrl-btn.end { width: 52px; height: 52px; }
+            .landing-hero h1 { font-size: 1.8rem; }           // 缩小标题
+            .mode-selector { flex-direction: column; }          // 模式选择器改为纵向
+            .action-cards { grid-template-columns: 1fr; }       // 操作卡片改为单列
+            .video-grid { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }  // 视频网格改为单列
+            .sidebar { width: 100%; }                           // 侧边栏全宽
+            .ctrl-btn { width: 46px; height: 46px; font-size: 1rem; }  // 缩小控制按钮
+            .ctrl-btn.end { width: 52px; height: 52px; }       // 缩小挂断按钮
         }
     </style>
 </head>
 <body>
+    <!-- 背景氛围层：光晕效果 -->
     <div class="bg-atmosphere"></div>
+    <!-- 背景网格：科技感网格线 -->
     <div class="bg-grid"></div>
 
+    <!-- 应用主容器 -->
     <div class="app">
-        <!-- 顶栏 -->
+        <!-- 顶栏：Logo + 状态信息 -->
         <div class="topbar">
             <div class="logo">
                 <div class="logo-icon">🔗</div>
                 <span>FaceLink</span>
             </div>
             <div class="topbar-right">
+                <!-- 主持人徽章：仅会议主持人可见 -->
                 <span class="host-badge" id="hostBadge">👑 主持人</span>
+                <!-- 参会者数量徽章：会议中显示当前人数 -->
                 <div class="participants-badge" id="participantsBadge">
                     👥 <span id="participantCount">0</span> 人
                 </div>
+                <!-- 连接状态指示器 -->
                 <div class="status-badge">
                     <span class="status-dot" id="statusDot"></span>
                     <span id="statusText">未连接</span>
@@ -362,14 +463,15 @@
             </div>
         </div>
 
-        <!-- 主区域 -->
+        <!-- 主内容区域 -->
         <div class="main-area">
-            <!-- 着陆页 -->
+            <!-- 着陆页：选择模式、创建/加入房间 -->
             <div class="landing" id="landing">
                 <div class="landing-hero">
                     <h1>视频通话与会议</h1>
                     <p>无需注册，无需安装，发送链接即可开始<br>支持私密通话与多人会议，端对端加密</p>
                 </div>
+                <!-- 模式选择：私密通话 / 多人会议 -->
                 <div class="mode-selector">
                     <div class="mode-card selected" id="modePrivate" onclick="selectMode('private')">
                         <div class="mode-card-icon">🤝</div>
@@ -382,6 +484,7 @@
                         <p>最多6人，主持人管理</p>
                     </div>
                 </div>
+                <!-- 操作卡片：创建房间、输入房间号、粘贴链接 -->
                 <div class="action-cards">
                     <div class="action-card primary" onclick="createRoom()">
                         <div class="action-card-icon">📞</div>
@@ -401,93 +504,180 @@
                 </div>
             </div>
 
-            <!-- 分享面板 -->
+            <!-- 分享面板：创建房间后显示，等待对方加入 -->
             <div class="share-panel" id="sharePanel">
                 <h2 id="shareTitle">🔗 等待对方加入</h2>
                 <p style="color: var(--text-secondary); text-align: center;" id="shareDesc">将以下链接发送给对方，对方打开即可通话</p>
+                <!-- 分享链接输入框 + 复制按钮 -->
                 <div class="share-box">
                     <input type="text" id="shareLink" readonly>
                     <button id="copyBtn" onclick="copyLink()">复制链接</button>
                 </div>
+                <!-- 房间号显示 -->
                 <div class="room-info">
                     <span>房间号：</span>
                     <span class="room-id" id="roomIdDisplay"></span>
                 </div>
+                <!-- 等待连接动画 -->
                 <div class="waiting-indicator">
                     <div class="waiting-dots"><span></span><span></span><span></span></div>
                     <span>等待连接中...</span>
                 </div>
             </div>
 
-            <!-- 会议视图 -->
+            <!-- 会议视图：视频通话主界面 -->
             <div class="meeting-view" id="meetingView">
+                <!-- 视频网格：动态排列所有参会者的视频画面 -->
                 <div class="video-grid grid-1" id="videoGrid"></div>
+                <!-- 通话计时器 -->
                 <div class="call-timer" id="callTimer">00:00</div>
+                <!-- 连接中覆盖层：等待 WebRTC 连接建立时显示 -->
                 <div class="connecting-overlay" id="connectingOverlay">
                     <div class="connecting-spinner"></div>
                     <p>正在建立连接...</p>
                 </div>
-                <!-- 参会者面板 -->
+                <!-- 参会者侧边栏 -->
                 <div class="sidebar" id="sidebar">
                     <div class="sidebar-header">
                         <h3>参会者 (<span id="sidebarCount">0</span>)</h3>
                         <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
                     </div>
+                    <!-- 参会者列表：动态渲染 -->
                     <div class="participant-list" id="participantList"></div>
                 </div>
             </div>
         </div>
 
-        <!-- 控制栏 -->
+        <!-- 底部控制栏：会议中的操作按钮 -->
         <div class="controls" id="controls">
+            <!-- 麦克风开关 -->
             <button class="ctrl-btn default" id="micBtn" onclick="toggleMic()">
                 🔇<span class="tooltip">麦克风已关闭</span>
             </button>
+            <!-- 摄像头开关 -->
             <button class="ctrl-btn default" id="camBtn" onclick="toggleCam()">
                 🚫<span class="tooltip">摄像头已关闭</span>
             </button>
+            <!-- 参会者面板开关 -->
             <button class="ctrl-btn default" id="sidebarBtn" onclick="toggleSidebar()">
                 👥<span class="tooltip">参会者</span>
             </button>
+            <!-- 挂断按钮 -->
             <button class="ctrl-btn end" onclick="hangUp()">
                 📞<span class="tooltip">挂断</span>
             </button>
         </div>
     </div>
 
+    <!-- Toast 消息容器 -->
     <div class="toast-container" id="toastContainer"></div>
 
     <script>
-        // ===== 常量 =====
+        // ===== 常量定义 =====
+
+        // 最大参会人数限制
         const MAX_PARTICIPANTS = 6;
+
+        // PeerJS 连接 ID 前缀，用于区分本应用的连接
         const PEER_PREFIX = 'facelink-';
 
-        // ===== 状态 =====
+        // ===== 自建信令服务器配置 =====
+        // 如果你有自建的 PeerJS 信令服务器（如部署在 Render.com），将地址填入下方
+        // 格式：'https://你的域名.onrender.com'（不要加端口和路径）
+        // 留空则使用 PeerJS 公共服务器（0.peerjs.com，国内可能不稳定）
+        const CUSTOM_PEER_SERVER = '';
+        // 自建服务器的路径（需与服务器端 server.js 中的 path 配置一致）
+        const CUSTOM_PEER_PATH = '/myapp';
+
+        // ===== 状态变量 =====
+
+        // PeerJS 实例，管理 WebRTC 信令连接
         let peer = null;
+
+        // ===== MQTT 备用信令相关变量 =====
+        // MQTT 客户端实例（备用信令通道）
+        let mqttClient = null;
+        // 当前使用的信令模式：'peerjs'（主）或 'mqtt'（备用）
+        let signalingMode = 'peerjs';
+        // MQTT 连接超时定时器
+        let peerjsTimeout = null;
+        // PeerJS 信令连接超时时间（毫秒）
+        const PEERJS_TIMEOUT = 5000;  // 5 秒（缩短等待时间，更快切换到备用通道）
+        // MQTT 备用 broker 列表（按优先级排序，依次尝试）
+        const MQTT_BROKERS = [
+            'wss://broker.emqx.io:8084/mqtt',       // EMQX 全球公共 broker（WSS 加密）
+            'wss://broker.hivemq.com:8884/mqtt',     // HiveMQ 公共 broker（WSS 加密）
+            'ws://broker.emqx.io:8083/mqtt',         // EMQX 非加密（某些网络环境下 WSS 被拦截时可用）
+        ];
+        // MQTT 主题前缀
+        const MQTT_TOPIC_PREFIX = 'facelink/signaling/';
+
+        // 本地媒体流，包含本地的音频和视频轨道
         let localStream = new MediaStream();
+
+        // 是否为房间主持人（创建房间者为 true）
         let isHost = false;
+
+        // 当前房间 ID（6位随机字母数字）
         let roomId = null;
+
+        // 当前用户的 PeerJS 连接 ID
         let myPeerId = null;
+
+        // 当前用户的显示名称（随机生成的中文昵称）
         let myDisplayName = '';
+
+        // 麦克风是否开启
         let isMicOn = false;
+
+        // 摄像头是否开启
         let isCamOn = false;
+
+        // 通话计时器定时器引用
         let callTimerInterval = null;
+
+        // 通话开始时间戳
         let callStartTime = null;
-        let mode = 'private'; // 'private' | 'meeting'
+
+        // 当前选择的模式：'private'（私密通话）或 'meeting'（多人会议）
+        let mode = 'private';
+
+        // ===== 异步锁变量 =====
+        // 防止用户快速重复点击导致并发问题
+        // 麦克风切换锁：防止重复触发 toggleMic
         let _isTogglingMic = false;
+        // 摄像头切换锁：防止重复触发 toggleCam
         let _isTogglingCam = false;
+        // 创建房间锁：防止重复触发 createRoom
         let _isCreating = false;
+        // 加入房间锁：防止重复触发 joinRoom
         let _isJoining = false;
 
-        // 连接管理：key=peerId, value={call, conn, name, isMicOn, isCamOn}
+        // ===== 连接管理数据结构 =====
+
+        // 已建立的 peer 连接映射
+        // key: 对方 peerId, value: { call, conn, remoteStream, name, isMicOn, isCamOn }
+        // - call: MediaConnection（WebRTC 媒体连接）
+        // - conn: DataConnection（数据通道，用于信令消息）
+        // - remoteStream: 对方的远程媒体流
         let peers = new Map();
-        // 参会者列表（包含自己）：key=peerId, value={name, isHost, isMicOn, isCamOn}
+
+        // 参会者列表（包含自己）
+        // key: peerId, value: { name, isHost, isMicOn, isCamOn }
         let participants = new Map();
 
-        // ===== DOM =====
+        // ===== DOM 工具 =====
+
+        // 简写 getElementById，方便快速获取 DOM 元素
         const $ = id => document.getElementById(id);
 
         // ===== 工具函数 =====
+
+        /**
+         * 生成6位随机房间号
+         * 使用大写字母和数字（排除了容易混淆的 I/O/0/1）
+         * @returns {string} 6位房间号字符串
+         */
         function generateRoomId() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let id = '';
@@ -495,27 +685,50 @@
             return id;
         }
 
+        /**
+         * 生成随机中文昵称
+         * 格式：形容词 + 名词（如"快乐的小熊"）
+         * @returns {string} 随机中文昵称
+         */
         function generateName() {
             const adjectives = ['快乐的', '聪明的', '勇敢的', '活泼的', '安静的', '温暖的'];
             const nouns = ['小熊', '小猫', '小兔', '小鸟', '小鱼', '小虎'];
             return adjectives[Math.floor(Math.random() * adjectives.length)] + nouns[Math.floor(Math.random() * nouns.length)];
         }
 
+        /**
+         * 显示 Toast 消息提示
+         * 消息会在 3 秒后自动消失
+         * @param {string} msg - 提示文字内容
+         * @param {'info'|'success'|'error'} type - 消息类型，影响边框颜色
+         */
         function showToast(msg, type = 'info') {
             const c = $('toastContainer');
             const t = document.createElement('div');
             t.className = `toast ${type}`;
             t.textContent = msg;
             c.appendChild(t);
+            // 3秒后自动移除
             setTimeout(() => t.remove(), 3000);
         }
 
+        /**
+         * 更新顶栏连接状态显示
+         * @param {string} text - 状态文字（如"未连接"、"通话中"）
+         * @param {string} state - 状态样式类名（'' | 'connected' | 'waiting'）
+         */
         function setStatus(text, state) {
             $('statusText').textContent = text;
             $('statusDot').className = 'status-dot ' + (state || '');
         }
 
+        /**
+         * 切换主视图（着陆页 / 分享面板 / 会议视图）
+         * 同时控制顶栏徽章和控制栏的显隐
+         * @param {'landing'|'share'|'meeting'} view - 要显示的视图名称
+         */
         function showView(view) {
+            // 先隐藏所有视图
             $('landing').style.display = 'none';
             $('sharePanel').classList.remove('visible');
             $('meetingView').classList.remove('visible');
@@ -523,26 +736,37 @@
             $('hostBadge').classList.remove('visible');
             $('participantsBadge').classList.remove('visible');
 
+            // 根据参数显示对应视图
             if (view === 'landing') $('landing').style.display = 'flex';
             if (view === 'share') $('sharePanel').classList.add('visible');
             if (view === 'meeting') {
                 $('meetingView').classList.add('visible');
                 $('controls').classList.add('visible');
                 $('participantsBadge').classList.add('visible');
+                // 主持人额外显示主持人徽章
                 if (isHost) $('hostBadge').classList.add('visible');
             }
         }
 
+        /**
+         * 更新参会者数量显示
+         * 同步更新顶栏和侧边栏的人数计数
+         */
         function updateParticipantCount() {
             const count = participants.size;
             $('participantCount').textContent = count;
             $('sidebarCount').textContent = count;
         }
 
+        /**
+         * 启动通话计时器
+         * 从当前时间开始计时，每秒更新显示
+         */
         function startTimer() {
             callStartTime = Date.now();
             $('callTimer').classList.add('visible');
             callTimerInterval = setInterval(() => {
+                // 计算已过时间，格式化为 MM:SS
                 const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
                 const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
                 const s = String(elapsed % 60).padStart(2, '0');
@@ -550,6 +774,9 @@
             }, 1000);
         }
 
+        /**
+         * 停止通话计时器并重置显示
+         */
         function stopTimer() {
             clearInterval(callTimerInterval);
             $('callTimer').classList.remove('visible');
@@ -557,10 +784,18 @@
         }
 
         // ===== 模式选择 =====
+
+        /**
+         * 切换通话模式（私密通话 / 多人会议）
+         * 更新选中状态的 UI 和按钮文字
+         * @param {'private'|'meeting'} m - 要切换到的模式
+         */
         function selectMode(m) {
             mode = m;
+            // 切换模式卡片的选中样式
             $('modePrivate').classList.toggle('selected', m === 'private');
             $('modeMeeting').classList.toggle('selected', m === 'meeting');
+            // 根据模式更新创建按钮的文字和描述
             $('createBtnText').textContent = m === 'private' ? '创建通话房间' : '创建会议房间';
             $('createBtnDesc').textContent = m === 'private'
                 ? '生成链接发给对方，等待对方加入'
@@ -568,18 +803,28 @@
         }
 
         // ===== 媒体管理 =====
+
+        /**
+         * 切换麦克风开关
+         * 使用异步锁 _isTogglingMic 防止重复触发
+         * 开启时请求音频权限，关闭时停止并移除音频轨道
+         * 状态变更后同步更新参会者列表和视频网格
+         */
         async function toggleMic() {
+            // 异步锁检查：如果正在切换中则直接返回
             if (_isTogglingMic) return;
             _isTogglingMic = true;
             const btn = $('micBtn');
             try {
                 if (isMicOn) {
+                    // 关闭麦克风：移除并停止所有音频轨道
                     localStream.getAudioTracks().forEach(t => { localStream.removeTrack(t); t.stop(); });
                     isMicOn = false;
                     btn.classList.remove('active');
                     btn.innerHTML = '🔇<span class="tooltip">麦克风已关闭</span>';
                     showToast('麦克风已关闭');
                 } else {
+                    // 开启麦克风：请求音频权限（带回声消除和降噪）
                     const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
                     const track = s.getAudioTracks()[0];
                     localStream.addTrack(track);
@@ -587,8 +832,10 @@
                     btn.classList.add('active');
                     btn.innerHTML = '🎤<span class="tooltip">麦克风</span>';
                     showToast('麦克风已开启');
+                    // 替换所有已建立连接中的音频轨道
                     replaceTrackForAll(track, 'audio');
                 }
+                // 更新本地参会者状态并广播给其他参会者
                 participants.set(myPeerId, { name: myDisplayName, isHost: isHost, isMicOn, isCamOn });
                 broadcastState();
                 renderVideoGrid();
@@ -596,23 +843,34 @@
             } catch (e) {
                 showToast('麦克风操作失败', 'error');
             } finally {
+                // 无论成功失败，释放异步锁
                 _isTogglingMic = false;
             }
         }
 
+        /**
+         * 切换摄像头开关
+         * 使用异步锁 _isTogglingCam 防止重复触发
+         * 开启时请求视频权限（1280x720），关闭时停止并移除视频轨道
+         * 状态变更后同步更新参会者列表和视频网格
+         */
         async function toggleCam() {
+            // 异步锁检查：如果正在切换中则直接返回
             if (_isTogglingCam) return;
             _isTogglingCam = true;
             const btn = $('camBtn');
             try {
                 if (isCamOn) {
+                    // 关闭摄像头：移除并停止所有视频轨道
                     localStream.getVideoTracks().forEach(t => { localStream.removeTrack(t); t.stop(); });
                     isCamOn = false;
                     btn.classList.remove('active');
                     btn.innerHTML = '🚫<span class="tooltip">摄像头已关闭</span>';
                     showToast('摄像头已关闭');
+                    // 清除本地视频元素的流
                     $('localVideo') && ($('localVideo').srcObject = null);
                 } else {
+                    // 开启摄像头：请求视频权限（720p，前置摄像头）
                     const s = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } });
                     const track = s.getVideoTracks()[0];
                     localStream.addTrack(track);
@@ -620,8 +878,10 @@
                     btn.classList.add('active');
                     btn.innerHTML = '📷<span class="tooltip">摄像头</span>';
                     showToast('摄像头已开启');
+                    // 替换所有已建立连接中的视频轨道
                     replaceTrackForAll(track, 'video');
                 }
+                // 更新本地参会者状态并广播给其他参会者
                 participants.set(myPeerId, { name: myDisplayName, isHost: isHost, isMicOn, isCamOn });
                 broadcastState();
                 renderVideoGrid();
@@ -629,24 +889,38 @@
             } catch (e) {
                 showToast('摄像头操作失败', 'error');
             } finally {
+                // 无论成功失败，释放异步锁
                 _isTogglingCam = false;
             }
         }
 
+        /**
+         * 替换所有已建立连接中的媒体轨道
+         * 当用户开关麦克风/摄像头时，需要用新轨道替换旧轨道，而不必重新建立连接
+         * @param {MediaStreamTrack} newTrack - 新的媒体轨道
+         * @param {'audio'|'video'} kind - 轨道类型
+         */
         function replaceTrackForAll(newTrack, kind) {
             peers.forEach(({ call }) => {
                 if (!call || !call.peerConnection) return;
+                // 在 RTCPeerConnection 的发送器中找到对应类型的轨道并替换
                 const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === kind);
                 if (sender) sender.replaceTrack(newTrack).catch(e => console.error('替换轨道失败:', e));
             });
         }
 
         // ===== 视频网格渲染 =====
+
+        /**
+         * 渲染视频网格
+         * 根据参会者数量选择合适的网格布局（1-6人）
+         * 先渲染自己的视频，再渲染其他参会者
+         */
         function renderVideoGrid() {
             const grid = $('videoGrid');
             grid.innerHTML = '';
 
-            // 确定网格布局
+            // 根据参会者数量确定网格布局类名
             const count = participants.size;
             grid.className = 'video-grid';
             if (count <= 1) grid.classList.add('grid-1');
@@ -654,27 +928,37 @@
             else if (count <= 4) grid.classList.add('grid-4');
             else grid.classList.add('grid-' + Math.min(count, 6));
 
-            // 先渲染自己
+            // 先渲染自己的视频卡片
             const myInfo = participants.get(myPeerId);
             grid.appendChild(createVideoTile(myPeerId, myInfo, true));
 
-            // 渲染其他人
+            // 再渲染其他参会者的视频卡片
             participants.forEach((info, peerId) => {
                 if (peerId === myPeerId) return;
                 grid.appendChild(createVideoTile(peerId, info, false));
             });
         }
 
+        /**
+         * 创建单个视频卡片元素
+         * 包含视频元素、占位符（无视频时）、名称标签、麦克风关闭图标
+         * @param {string} peerId - 参会者的 PeerJS ID
+         * @param {object} info - 参会者信息 { name, isHost, isMicOn, isCamOn }
+         * @param {boolean} isLocal - 是否为本地用户（影响镜像翻转和视频源）
+         * @returns {HTMLElement} 视频卡片 DOM 元素
+         */
         function createVideoTile(peerId, info, isLocal) {
             const tile = document.createElement('div');
             tile.className = 'video-tile' + (isLocal ? ' local-tile' : '');
             tile.id = 'tile-' + peerId;
 
+            // 创建 video 元素
             const video = document.createElement('video');
             video.id = 'video-' + peerId;
             video.autoplay = true;
             video.playsinline = true;
 
+            // 设置视频源：本地用 localStream，远程用对方的 remoteStream
             if (isLocal && isCamOn) {
                 video.srcObject = localStream;
             } else if (!isLocal && peers.has(peerId)) {
@@ -683,10 +967,11 @@
 
             tile.appendChild(video);
 
-            // 占位符（无视频时显示）
+            // 创建占位符（无视频流时显示头像和名称）
             const placeholder = document.createElement('div');
             placeholder.className = 'video-tile-placeholder';
             placeholder.id = 'placeholder-' + peerId;
+            // 判断是否需要显示占位符
             if (isLocal && !isCamOn || !isLocal && (!peers.has(peerId) || !peers.get(peerId).remoteStream)) {
                 placeholder.style.display = 'flex';
             } else {
@@ -695,15 +980,16 @@
             placeholder.innerHTML = `<div class="avatar">${isLocal ? '😊' : '👤'}</div><p>${info ? info.name : '等待中...'}</p>`;
             tile.appendChild(placeholder);
 
-            // 标签
+            // 创建底部名称标签
             const label = document.createElement('div');
             label.className = 'tile-label';
             let labelHTML = (info ? info.name : '未知');
+            // 主持人显示皇冠标签
             if (info && info.isHost) labelHTML += ' <span class="host-tag">👑 主持</span>';
             label.innerHTML = labelHTML;
             tile.appendChild(label);
 
-            // 麦克风关闭图标
+            // 麦克风关闭时显示静音图标
             if (info && !info.isMicOn) {
                 const micOff = document.createElement('div');
                 micOff.className = 'tile-mic-off';
@@ -715,6 +1001,12 @@
         }
 
         // ===== 参会者列表渲染 =====
+
+        /**
+         * 渲染侧边栏中的参会者列表
+         * 每个参会者显示头像、名称、麦克风/摄像头状态
+         * 主持人可以看到对其他参会者的操作按钮（请求静音、移出）
+         */
         function renderParticipantList() {
             const list = $('participantList');
             list.innerHTML = '';
@@ -723,14 +1015,18 @@
                 const item = document.createElement('div');
                 item.className = 'participant-item';
 
+                // 头像：自己用 😊，其他人用 👤
                 const avatar = document.createElement('div');
                 avatar.className = 'participant-avatar';
                 avatar.textContent = peerId === myPeerId ? '😊' : '👤';
 
+                // 参会者信息：名称 + 状态
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'participant-info';
                 let nameHTML = info.name;
+                // 主持人标签
                 if (info.isHost) nameHTML += ' <span class="host-tag">👑 主持</span>';
+                // 自己的标识
                 if (peerId === myPeerId) nameHTML += ' <span class="host-tag" style="color:var(--accent);background:var(--accent-dim);">我</span>';
                 infoDiv.innerHTML = `<div class="participant-name">${nameHTML}</div>
                     <div class="participant-status">${!info.isMicOn ? '🔇 麦克风关闭' : '🎤 麦克风开启'} · ${!info.isCamOn ? '📷 摄像头关闭' : '📹 摄像头开启'}</div>`;
@@ -738,17 +1034,19 @@
                 item.appendChild(avatar);
                 item.appendChild(infoDiv);
 
-                // 主持人操作按钮
+                // 主持人操作按钮：仅主持人可见，且不能对自己操作
                 if (isHost && peerId !== myPeerId) {
                     const actions = document.createElement('div');
                     actions.className = 'participant-actions';
 
+                    // 请求静音按钮
                     const muteBtn = document.createElement('button');
                     muteBtn.textContent = '🔇';
                     muteBtn.title = '请求静音';
                     muteBtn.onclick = () => requestMute(peerId);
                     actions.appendChild(muteBtn);
 
+                    // 移出会议按钮
                     const removeBtn = document.createElement('button');
                     removeBtn.textContent = '✕';
                     removeBtn.className = 'danger';
@@ -764,6 +1062,12 @@
         }
 
         // ===== 主持人功能 =====
+
+        /**
+         * 主持人请求某参会者静音
+         * 通过数据通道发送 'host-mute' 消息，对方收到后会自动关闭麦克风
+         * @param {string} peerId - 目标参会者的 PeerJS ID
+         */
         function requestMute(peerId) {
             if (!isHost || !peers.has(peerId)) return;
             const conn = peers.get(peerId).conn;
@@ -773,29 +1077,42 @@
             }
         }
 
+        /**
+         * 主持人移出某参会者
+         * 先发送 'host-remove' 消息通知对方，然后关闭与该参会者的所有连接
+         * @param {string} peerId - 目标参会者的 PeerJS ID
+         */
         function removeParticipant(peerId) {
             if (!isHost || !peers.has(peerId)) return;
             const conn = peers.get(peerId).conn;
             if (conn && conn.open) {
+                // 通知被移出的参会者
                 conn.send({ type: 'host-remove' });
             }
-            // 关闭与该参与者的连接
+            // 关闭与该参与者的媒体连接和数据连接
             const peerData = peers.get(peerId);
             if (peerData) {
                 if (peerData.call) peerData.call.close();
                 if (peerData.conn) peerData.conn.close();
             }
+            // 从连接列表和参会者列表中移除
             peers.delete(peerId);
             participants.delete(peerId);
             renderVideoGrid();
             renderParticipantList();
             updateParticipantCount();
             showToast(`已移出 ${participants.get(peerId)?.name || '参会者'}`);
-            // 广播更新
+            // 广播更新后的参会者列表给所有人
             broadcastParticipantList();
         }
 
         // ===== 信令广播 =====
+
+        /**
+         * 广播本地状态更新给所有已连接的参会者
+         * 发送自己的名称、主持人身份、麦克风/摄像头状态
+         * 消息类型：'state-update'
+         */
         function broadcastState() {
             const state = { type: 'state-update', peerId: myPeerId, data: { name: myDisplayName, isHost, isMicOn, isCamOn } };
             peers.forEach(({ conn }) => {
@@ -803,6 +1120,11 @@
             });
         }
 
+        /**
+         * 广播完整参会者列表给所有已连接的参会者
+         * 通常由主持人发送，确保所有参会者的列表一致
+         * 消息类型：'participant-list'
+         */
         function broadcastParticipantList() {
             const list = {};
             participants.forEach((v, k) => { list[k] = v; });
@@ -813,8 +1135,21 @@
         }
 
         // ===== Data Channel 消息处理 =====
+
+        /**
+         * 处理通过数据通道接收到的信令消息
+         * 支持以下消息类型：
+         * - 'state-update'：某参会者的状态变更（麦克风/摄像头开关等）
+         * - 'participant-list'：主持人发送的完整参会者列表
+         * - 'host-mute'：主持人请求静音
+         * - 'host-remove'：主持人将本用户移出会议
+         * - 'introduce'：新成员的自我介绍，需要转发给其他人
+         * @param {string} peerId - 发送消息的参会者 PeerJS ID
+         * @param {object} data - 消息对象，包含 type 字段和对应数据
+         */
         function handleDataMessage(peerId, data) {
             switch (data.type) {
+                // 状态更新：更新该参会者的信息并刷新 UI
                 case 'state-update':
                     if (participants.has(data.peerId)) {
                         participants.set(data.peerId, { ...participants.get(data.peerId), ...data.data });
@@ -823,8 +1158,8 @@
                     }
                     break;
 
+                // 参会者列表：从主持人获取完整列表，补充本地缺失的参会者
                 case 'participant-list':
-                    // 从主持人获取完整参会者列表
                     Object.entries(data.list).forEach(([k, v]) => {
                         if (k !== myPeerId && !participants.has(k)) {
                             participants.set(k, v);
@@ -835,19 +1170,20 @@
                     updateParticipantCount();
                     break;
 
+                // 主持人请求静音：显示提示并自动关闭麦克风
                 case 'host-mute':
                     showToast('主持人请求你静音', 'error');
-                    // 自动关闭麦克风
                     if (isMicOn) toggleMic();
                     break;
 
+                // 被主持人移出：显示提示并挂断
                 case 'host-remove':
                     showToast('你已被主持人移出会议', 'error');
                     hangUp();
                     break;
 
+                // 新成员自我介绍：添加到参会者列表，转发给其他 peer，主持人回传完整列表
                 case 'introduce':
-                    // 新成员自我介绍，通知所有人
                     const newInfo = data.data;
                     if (!participants.has(peerId)) {
                         participants.set(peerId, { name: newInfo.name, isHost: false, isMicOn: newInfo.isMicOn, isCamOn: newInfo.isCamOn });
@@ -856,11 +1192,11 @@
                         updateParticipantCount();
                         showToast(`${newInfo.name} 加入了会议`);
                     }
-                    // 转发给其他peer
+                    // 将新成员信息转发给其他已连接的 peer（mesh 网络拓扑）
                     peers.forEach(({ conn }, pid) => {
                         if (pid !== peerId && conn && conn.open) conn.send(data);
                     });
-                    // 如果是主持人，发送完整列表给新成员
+                    // 如果自己是主持人，向新成员发送完整的参会者列表
                     if (isHost) {
                         const list = {};
                         participants.forEach((v, k) => { list[k] = v; });
@@ -871,28 +1207,443 @@
             }
         }
 
+        // ===== MQTT 备用信令系统 =====
+
+        /**
+         * 初始化 MQTT 客户端，依次尝试多个 broker 直到连接成功
+         * 使用多个公共 MQTT broker 作为备用信令通道，提高国内连接成功率
+         * @returns {Promise<boolean>} 是否连接成功
+         */
+        async function initMQTT() {
+            for (let i = 0; i < MQTT_BROKERS.length; i++) {
+                const brokerUrl = MQTT_BROKERS[i];
+                console.log(`[MQTT] 尝试连接 broker ${i + 1}/${MQTT_BROKERS.length}: ${brokerUrl}`);
+                setStatus(`正在连接备用通道 (${i + 1}/${MQTT_BROKERS.length})...`, 'waiting');
+
+                const connected = await tryConnectMQTT(brokerUrl);
+                if (connected) {
+                    console.log(`[MQTT] 成功连接到 broker ${i + 1}: ${brokerUrl}`);
+                    return true;
+                }
+                console.warn(`[MQTT] broker ${i + 1} 连接失败，尝试下一个`);
+            }
+            console.error('[MQTT] 所有 broker 均连接失败');
+            return false;
+        }
+
+        /**
+         * 尝试连接单个 MQTT broker
+         * @param {string} brokerUrl - broker 的 WebSocket URL
+         * @returns {Promise<boolean>} 是否连接成功
+         */
+        function tryConnectMQTT(brokerUrl) {
+            return new Promise((resolve) => {
+                try {
+                    const client = mqtt.connect(brokerUrl, {
+                        clientId: 'facelink_' + Math.random().toString(36).substr(2, 12),
+                        clean: true,
+                        connectTimeout: 4000,  // 4 秒连接超时（缩短等待时间）
+                        reconnectPeriod: 0     // 不自动重连，由应用层控制
+                    });
+
+                    let resolved = false;
+
+                    client.on('connect', () => {
+                        if (!resolved) {
+                            resolved = true;
+                            mqttClient = client;  // 保存成功连接的客户端
+                            // 注册消息监听
+                            client.on('message', (topic, message) => {
+                                try {
+                                    const data = JSON.parse(message.toString());
+                                    handleMQTTMessage(data);
+                                } catch (e) {
+                                    console.error('[MQTT] 消息解析失败:', e);
+                                }
+                            });
+                            resolve(true);
+                        }
+                    });
+
+                    client.on('error', (err) => {
+                        if (!resolved) {
+                            resolved = true;
+                            console.error(`[MQTT] ${brokerUrl} 连接失败:`, err.message);
+                            client.end(true);
+                            resolve(false);
+                        }
+                    });
+
+                    // 4 秒连接超时
+                    setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            console.warn(`[MQTT] ${brokerUrl} 连接超时`);
+                            client.end(true);
+                            resolve(false);
+                        }
+                    }, 4000);
+                } catch (e) {
+                    console.error(`[MQTT] ${brokerUrl} 初始化异常:`, e);
+                    resolve(false);
+                }
+            });
+        }
+
+        /**
+         * 通过 MQTT 发送信令消息
+         * @param {string} targetPeerId - 目标用户的 PeerJS ID
+         * @param {object} message - 消息对象
+         */
+        function mqttSend(targetPeerId, message) {
+            if (!mqttClient || !mqttClient.connected) {
+                console.error('[MQTT] 未连接，无法发送消息');
+                return;
+            }
+            const topic = MQTT_TOPIC_PREFIX + targetPeerId;
+            mqttClient.publish(topic, JSON.stringify(message));
+        }
+
+        /**
+         * 订阅指定 PeerID 的 MQTT 主题（接收该用户的消息）
+         * @param {string} peerId - 要监听的 PeerJS ID
+         */
+        function mqttSubscribe(peerId) {
+            if (!mqttClient || !mqttClient.connected) return;
+            const topic = MQTT_TOPIC_PREFIX + peerId;
+            mqttClient.subscribe(topic);
+            console.log('[MQTT] 已订阅:', topic);
+        }
+
+        /**
+         * 取消订阅指定 PeerID 的 MQTT 主题
+         * @param {string} peerId - 要取消监听的 PeerJS ID
+         */
+        function mqttUnsubscribe(peerId) {
+            if (!mqttClient || !mqttClient.connected) return;
+            const topic = MQTT_TOPIC_PREFIX + peerId;
+            mqttClient.unsubscribe(topic);
+        }
+
+        /**
+         * 处理收到的 MQTT 信令消息
+         * MQTT 信令消息类型：
+         * - signal: WebRTC SDP offer/answer 和 ICE candidate
+         * - introduce: 参会者自我介绍
+         * - participant-list: 主持人发送的参会者列表
+         * - host-mute: 主持人静音/关闭摄像头指令
+         * - host-remove: 主持人移除参会者指令
+         * @param {object} data - 消息数据
+         */
+        function handleMQTTMessage(data) {
+            if (!data || !data.type || !data.from) return;
+
+            const fromPeerId = data.from;
+
+            switch (data.type) {
+                case 'signal':
+                    // WebRTC 信令：SDP offer/answer 或 ICE candidate
+                    handleMQTTSignal(fromPeerId, data.signal);
+                    break;
+                case 'introduce':
+                    // 参会者自我介绍
+                    if (!participants.has(fromPeerId)) {
+                        participants.set(fromPeerId, {
+                            name: data.data.name,
+                            isHost: data.data.isHost || false,
+                            isMicOn: data.data.isMicOn || false,
+                            isCamOn: data.data.isCamOn || false
+                        });
+                    }
+                    renderParticipantList();
+                    updateParticipantCount();
+                    break;
+                case 'participant-list':
+                    // 收到主持人发来的完整参会者列表
+                    if (data.list) {
+                        Object.entries(data.list).forEach(([pid, info]) => {
+                            participants.set(pid, info);
+                        });
+                        renderParticipantList();
+                        updateParticipantCount();
+                    }
+                    break;
+                case 'host-mute':
+                    // 主持人静音/关闭摄像头指令
+                    if (data.target === myPeerId) {
+                        if (data.media === 'mic' && isMicOn) toggleMic();
+                        if (data.media === 'cam' && isCamOn) toggleCam();
+                        showToast('主持人已' + (data.media === 'mic' ? '静音' : '关闭你的摄像头'), 'warning');
+                    }
+                    break;
+                case 'host-remove':
+                    // 主持人移除参会者
+                    if (data.target === myPeerId) {
+                        showToast('你已被主持人移出会议', 'error');
+                        hangUp();
+                    }
+                    break;
+            }
+        }
+
+        /**
+         * 处理通过 MQTT 收到的 WebRTC 信令
+         * 使用原生 RTCPeerConnection 处理 SDP 和 ICE candidate
+         * @param {string} fromPeerId - 发送方 PeerJS ID
+         * @param {object} signal - 信令数据 { type: 'offer'|'answer'|'candidate', sdp/candidate }
+         */
+        function handleMQTTSignal(fromPeerId, signal) {
+            if (!signal || !signal.type) return;
+
+            // 获取或创建与该 peer 的 RTCPeerConnection
+            let pcData = mqttPeers.get(fromPeerId);
+
+            if (!pcData) {
+                // 创建新的 RTCPeerConnection
+                const pc = createMQTTPeerConnection(fromPeerId);
+                pcData = { pc, remoteStream: new MediaStream() };
+                mqttPeers.set(fromPeerId, pcData);
+            }
+
+            const pc = pcData.pc;
+
+            switch (signal.type) {
+                case 'offer':
+                    pc.setRemoteDescription(new RTCSessionDescription(signal))
+                        .then(() => pc.createAnswer())
+                        .then(answer => pc.setLocalDescription(answer))
+                        .then(() => {
+                            mqttSend(fromPeerId, {
+                                type: 'signal',
+                                from: myPeerId,
+                                signal: pc.localDescription
+                            });
+                        })
+                        .catch(e => console.error('[MQTT] 处理 offer 失败:', e));
+                    break;
+                case 'answer':
+                    pc.setRemoteDescription(new RTCSessionDescription(signal))
+                        .catch(e => console.error('[MQTT] 处理 answer 失败:', e));
+                    break;
+                case 'candidate':
+                    if (signal.candidate) {
+                        pc.addIceCandidate(new RTCIceCandidate(signal.candidate))
+                            .catch(e => console.error('[MQTT] 添加 ICE candidate 失败:', e));
+                    }
+                    break;
+            }
+        }
+
+        /**
+         * 创建用于 MQTT 信令的 RTCPeerConnection
+         * 配置国内可达的 ICE 服务器
+         * @param {string} peerId - 对方 PeerJS ID
+         * @returns {RTCPeerConnection} WebRTC 对等连接
+         */
+        function createMQTTPeerConnection(peerId) {
+            const pc = new RTCPeerConnection({
+                iceServers: [
+                    // 阿里云 STUN 服务器（国内首选，延迟最低）
+                    { urls: 'stun:stun.aliyun.com:3478' },
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:stun.miwifi.com:3478' },
+                    { urls: 'stun:stun.schlund.de:3478' },
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ]
+            });
+
+            // 添加本地媒体轨道
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            // 监听远程流
+            pc.ontrack = (event) => {
+                const pcData = mqttPeers.get(peerId);
+                if (pcData) {
+                    pcData.remoteStream = event.streams[0] || new MediaStream();
+                    // 更新视频元素
+                    const videoEl = $('video-' + peerId);
+                    if (videoEl) videoEl.srcObject = pcData.remoteStream;
+                    const placeholder = $('placeholder-' + peerId);
+                    if (placeholder) placeholder.style.display = 'none';
+
+                    // 第一次收到流：进入会议状态
+                    if ($('connectingOverlay').classList.contains('visible')) {
+                        $('connectingOverlay').classList.remove('visible');
+                        showView('meeting');
+                        setStatus('通话中 (备用通道)', 'connected');
+                        startTimer();
+                        showToast('已通过备用通道连接成功', 'success');
+                    }
+                    renderVideoGrid();
+                    renderParticipantList();
+                    updateParticipantCount();
+                }
+            };
+
+            // 监听 ICE candidate，通过 MQTT 发送给对方
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    mqttSend(peerId, {
+                        type: 'signal',
+                        from: myPeerId,
+                        signal: { type: 'candidate', candidate: event.candidate }
+                    });
+                }
+            };
+
+            // 连接状态变化
+            pc.onconnectionstatechange = () => {
+                console.log('[MQTT] WebRTC 连接状态:', pc.connectionState);
+                if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                    removeMQTTPeer(peerId);
+                }
+            };
+
+            return pc;
+        }
+
+        // MQTT 模式下的 peer 连接映射
+        // key: peerId, value: { pc: RTCPeerConnection, remoteStream: MediaStream }
+        let mqttPeers = new Map();
+
+        /**
+         * 通过 MQTT 发起呼叫（创建 offer）
+         * @param {string} targetPeerId - 目标 PeerJS ID
+         */
+        function mqttCall(targetPeerId) {
+            const pc = createMQTTPeerConnection(targetPeerId);
+            const pcData = { pc, remoteStream: new MediaStream() };
+            mqttPeers.set(targetPeerId, pcData);
+
+            pc.createOffer()
+                .then(offer => pc.setLocalDescription(offer))
+                .then(() => {
+                    mqttSend(targetPeerId, {
+                        type: 'signal',
+                        from: myPeerId,
+                        signal: pc.localDescription
+                    });
+                })
+                .catch(e => console.error('[MQTT] 创建 offer 失败:', e));
+        }
+
+        /**
+         * 移除 MQTT 模式下的 peer
+         * @param {string} peerId - 要移除的 PeerJS ID
+         */
+        function removeMQTTPeer(peerId) {
+            const pcData = mqttPeers.get(peerId);
+            if (pcData) {
+                pcData.pc.close();
+                mqttPeers.delete(peerId);
+            }
+            const info = participants.get(peerId);
+            if (info) showToast(`${info.name} 离开了会议`);
+            participants.delete(peerId);
+            mqttUnsubscribe(peerId);
+            renderVideoGrid();
+            renderParticipantList();
+            updateParticipantCount();
+            if (participants.size <= 1 && callStartTime) stopTimer();
+        }
+
         // ===== 创建房间 =====
+
+        /**
+         * 创建新的通话/会议房间
+         * 使用异步锁 _isCreating 防止重复创建
+         * 流程：生成房间号 -> 创建 PeerJS 实例 -> 等待连接 -> 显示分享面板
+         * 创建者自动成为主持人
+         */
         async function createRoom() {
+            // 异步锁检查
             if (_isCreating) return;
             _isCreating = true;
+
+            // 初始化房间信息
             roomId = generateRoomId();
             isHost = true;
             myDisplayName = generateName();
+            // 主持人的 PeerJS ID 格式：facelink-{房间号}-host
             myPeerId = PEER_PREFIX + roomId + '-host';
 
             localStream = new MediaStream();
+            // 将自己添加到参会者列表
             participants.set(myPeerId, { name: myDisplayName, isHost: true, isMicOn: false, isCamOn: false });
 
             setStatus('正在连接...', 'waiting');
 
             try {
-                peer = new Peer(myPeerId, { debug: 0 });
+                // 设置 PeerJS 连接超时：超时后自动切换到 MQTT 备用通道
+                peerjsTimeout = setTimeout(() => {
+                    console.warn('[信令] PeerJS 连接超时，切换到 MQTT 备用通道');
+                    if (peer) { peer.destroy(); peer = null; }
+                    signalingMode = 'mqtt';
+                    createRoomViaMQTT();
+                }, PEERJS_TIMEOUT);
 
+                // 创建 PeerJS 实例，使用指定的 ID
+                // 配置 STUN 服务器帮助 NAT 穿透，使用多个公共 STUN 服务器提高连接成功率
+                // 配置 ICE 传输策略：优先 P2P，失败后尝试中继
+                peer = new Peer(myPeerId, {
+                    debug: 1,
+                    // 如果配置了自建服务器，使用自建服务器；否则使用 PeerJS 公共服务器
+                    ...(CUSTOM_PEER_SERVER ? {
+                        host: CUSTOM_PEER_SERVER,
+                        path: CUSTOM_PEER_PATH,
+                        secure: true
+                    } : {}),
+                    config: {
+                        iceServers: [
+                            // 阿里云 STUN 服务器（国内首选，延迟最低）
+                            { urls: 'stun:stun.aliyun.com:3478' },
+                            // 国内可达的 STUN 服务器
+                            { urls: 'stun:stun.cloudflare.com:3478' },
+                            { urls: 'stun:stun.miwifi.com:3478' },
+                            { urls: 'stun:stun.schlund.de:3478' },
+                            // 免费公共 TURN 服务器（Open Relay Project，用于对称 NAT 穿透）
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            }
+                        ],
+                        iceTransportPolicy: 'all' // 允许所有传输方式（P2P + 中继）
+                    }
+                });
+
+                // PeerJS 连接成功回调
                 peer.on('open', (id) => {
+                    // PeerJS 连接成功，清除备用通道超时
+                    clearTimeout(peerjsTimeout);
+                    signalingMode = 'peerjs';
                     setStatus('等待加入', 'waiting');
+                    // 生成分享链接（当前页面 URL + # + PeerJS ID）
                     const link = window.location.origin + window.location.pathname + '#' + id;
                     $('shareLink').value = link;
                     $('roomIdDisplay').textContent = roomId;
+                    // 根据模式更新分享面板文字
                     $('shareTitle').textContent = mode === 'private' ? '🔗 等待对方加入' : '🔗 等待参会者加入';
                     $('shareDesc').textContent = mode === 'private'
                         ? '将以下链接发送给对方，对方打开即可通话'
@@ -901,19 +1652,35 @@
                     showToast(mode === 'private' ? '房间创建成功' : '会议创建成功，你是主持人', 'success');
                 });
 
+                // 监听其他人的数据连接请求
                 peer.on('connection', (conn) => {
                     handleNewConnection(conn);
                 });
 
+                // 监听其他人的媒体通话请求
                 peer.on('call', (call) => {
                     handleIncomingCall(call);
                 });
 
+                // PeerJS 错误处理
                 peer.on('error', (err) => {
-                    console.error('PeerJS error:', err);
+                    console.error('PeerJS 错误:', err);
                     if (err.type === 'unavailable-id') {
+                        // 房间号冲突（极少发生）
                         showToast('房间号冲突，请重试', 'error');
                         peer.destroy();
+                        setStatus('连接失败', '');
+                    } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed') {
+                        // PeerJS 信令服务器不可用，尝试切换到 MQTT 备用通道
+                        clearTimeout(peerjsTimeout);
+                        console.warn('[信令] PeerJS 不可用，切换到 MQTT 备用通道');
+                        signalingMode = 'mqtt';
+                        createRoomViaMQTT();
+                    } else if (err.type === 'peer-unavailable') {
+                        showToast('找不到对方，房间可能已过期', 'error');
+                        setStatus('连接失败', '');
+                    } else if (err.type === 'webrtc') {
+                        showToast('WebRTC 连接失败，可能需要 TURN 服务器支持', 'error');
                         setStatus('连接失败', '');
                     } else {
                         showToast('连接错误: ' + err.type, 'error');
@@ -922,20 +1689,63 @@
             } catch (e) {
                 showToast('创建失败，请检查网络', 'error');
             } finally {
+                // 释放异步锁
                 _isCreating = false;
             }
         }
 
+        /**
+         * 通过 MQTT 备用通道创建房间
+         * 当 PeerJS 信令服务器不可用时自动调用
+         * 流程：连接 MQTT（多 broker 依次尝试）-> 订阅房间主题 -> 显示分享面板
+         */
+        async function createRoomViaMQTT() {
+            showToast('PeerJS 不可用，正在切换备用通道...', 'warning');
+            const connected = await initMQTT();
+            if (!connected) {
+                showToast('所有信令通道均不可用，请检查网络后刷新重试', 'error');
+                setStatus('连接失败', '');
+                showView('landing');
+                return;
+            }
+
+            // 订阅自己的主题（接收加入者的消息）
+            mqttSubscribe(myPeerId);
+            console.log('[MQTT] 房间已创建:', myPeerId);
+
+            setStatus('等待加入 (备用通道)', 'waiting');
+            const link = window.location.origin + window.location.pathname + '#' + myPeerId;
+            $('shareLink').value = link;
+            $('roomIdDisplay').textContent = roomId;
+            $('shareTitle').textContent = mode === 'private' ? '🔗 等待对方加入' : '🔗 等待参会者加入';
+            $('shareDesc').textContent = mode === 'private'
+                ? '将以下链接发送给对方，对方打开即可通话（备用通道）'
+                : '将以下链接发送给参会者，最多支持 ' + MAX_PARTICIPANTS + ' 人（备用通道）';
+            showView('share');
+            showToast('房间创建成功（备用通道）', 'success');
+        }
+
         // ===== 加入房间 =====
+
+        /**
+         * 通过输入房间号加入房间
+         * 弹出输入框让用户输入6位房间号
+         */
         async function joinByCode() {
             const code = prompt('请输入房间号：');
             if (!code || !code.trim()) return;
+            // 拼接主持人的 PeerJS ID 并加入
             await joinRoom(PEER_PREFIX + code.trim().toUpperCase() + '-host');
         }
 
+        /**
+         * 通过剪贴板链接加入房间
+         * 从剪贴板读取文本，提取 # 后面的 PeerJS ID
+         */
         async function joinByClipboard() {
             try {
                 const text = await navigator.clipboard.readText();
+                // 从链接中提取 # 后面的 hash 部分
                 const hash = text.trim().split('#').pop();
                 if (hash && hash.startsWith(PEER_PREFIX)) {
                     await joinRoom(hash);
@@ -947,6 +1757,10 @@
             }
         }
 
+        /**
+         * 通过 URL hash 自动加入房间
+         * 页面加载时检查 URL 中是否包含房间链接
+         */
         async function joinFromHash() {
             const hash = window.location.hash.slice(1);
             if (hash && hash.startsWith(PEER_PREFIX)) {
@@ -954,9 +1768,18 @@
             }
         }
 
+        /**
+         * 加入房间的核心函数
+         * 使用异步锁 _isJoining 防止重复加入
+         * 流程：创建 PeerJS 实例 -> 连接主持人 -> 自我介绍 -> 发起媒体通话
+         * @param {string} hostPeerId - 主持人的 PeerJS ID
+         */
         async function joinRoom(hostPeerId) {
+            // 异步锁检查
             if (_isJoining) return;
             _isJoining = true;
+
+            // 初始化加入者信息
             isHost = false;
             myDisplayName = generateName();
             localStream = new MediaStream();
@@ -966,26 +1789,75 @@
             $('connectingOverlay').classList.add('visible');
 
             try {
-                peer = new Peer(undefined, { debug: 0 });
+                // 设置 PeerJS 连接超时：超时后自动切换到 MQTT 备用通道
+                peerjsTimeout = setTimeout(() => {
+                    console.warn('[信令] PeerJS 连接超时，切换到 MQTT 备用通道');
+                    if (peer) { peer.destroy(); peer = null; }
+                    signalingMode = 'mqtt';
+                    joinRoomViaMQTT(hostPeerId);
+                }, PEERJS_TIMEOUT);
+
+                // 创建 PeerJS 实例，ID 由服务器自动分配
+                // 配置与 createRoom 相同的 STUN/TURN 服务器
+                peer = new Peer(undefined, {
+                    debug: 1,
+                    // 如果配置了自建服务器，使用自建服务器；否则使用 PeerJS 公共服务器
+                    ...(CUSTOM_PEER_SERVER ? {
+                        host: CUSTOM_PEER_SERVER,
+                        path: CUSTOM_PEER_PATH,
+                        secure: true
+                    } : {}),
+                    config: {
+                        iceServers: [
+                            // 阿里云 STUN 服务器（国内首选，延迟最低）
+                            { urls: 'stun:stun.aliyun.com:3478' },
+                            // 国内可达的 STUN 服务器
+                            { urls: 'stun:stun.cloudflare.com:3478' },
+                            { urls: 'stun:stun.miwifi.com:3478' },
+                            { urls: 'stun:stun.schlund.de:3478' },
+                            // 免费公共 TURN 服务器（Open Relay Project，用于对称 NAT 穿透）
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            }
+                        ],
+                        iceTransportPolicy: 'all'
+                    }
+                });
 
                 peer.on('open', () => {
+                    clearTimeout(peerjsTimeout);
+                    signalingMode = 'peerjs';
                     myPeerId = peer.id;
+                    // 将自己添加到参会者列表
                     participants.set(myPeerId, { name: myDisplayName, isHost: false, isMicOn: false, isCamOn: false });
 
-                    // 先建立 data channel
+                    // 第一步：建立与主持人的数据通道（DataConnection）
                     const conn = peer.connect(hostPeerId, { reliable: true });
                     conn.on('open', () => {
                         peers.set(hostPeerId, { conn, call: null, remoteStream: null });
-                        // 自我介绍
+                        // 向主持人发送自我介绍消息
                         conn.send({
                             type: 'introduce',
                             data: { name: myDisplayName, isMicOn: false, isCamOn: false }
                         });
+                        // 将主持人添加到参会者列表
                         participants.set(hostPeerId, { name: '主持人', isHost: true, isMicOn: false, isCamOn: false });
                         renderParticipantList();
                         updateParticipantCount();
 
-                        // 然后发起 media call
+                        // 第二步：向主持人发起媒体通话（MediaConnection）
                         setStatus('正在呼叫...', 'waiting');
                         const call = peer.call(hostPeerId, localStream);
                         if (call) {
@@ -994,28 +1866,39 @@
                         }
                     });
 
+                    // 监听主持人的数据消息
                     conn.on('data', (data) => handleDataMessage(hostPeerId, data));
+                    // 主持人断开连接时清理
                     conn.on('close', () => {
                         removePeer(hostPeerId);
                     });
                 });
 
+                // 监听其他参会者的连接（mesh 网络中，其他参会者也可能连接自己）
                 peer.on('connection', (conn) => {
-                    // 其他参会者连接我（mesh）
                     if (conn.peer !== hostPeerId) {
                         handleNewConnection(conn);
                     }
                 });
 
+                // 监听其他人的媒体通话
                 peer.on('call', (call) => {
                     handleIncomingCall(call);
                 });
 
+                // 错误处理
                 peer.on('error', (err) => {
-                    console.error('PeerJS error:', err);
+                    console.error('PeerJS 错误:', err);
                     $('connectingOverlay').classList.remove('visible');
                     if (err.type === 'peer-unavailable') {
-                        showToast('房间不存在或已过期', 'error');
+                        showToast('房间不存在或已过期，请确认链接是否正确', 'error');
+                    } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed') {
+                        clearTimeout(peerjsTimeout);
+                        console.warn('[信令] PeerJS 不可用，切换到 MQTT 备用通道');
+                        signalingMode = 'mqtt';
+                        joinRoomViaMQTT(hostPeerId);
+                    } else if (err.type === 'webrtc') {
+                        showToast('WebRTC 连接失败，可能需要 TURN 服务器支持', 'error');
                     } else {
                         showToast('连接失败: ' + err.type, 'error');
                     }
@@ -1027,32 +1910,88 @@
                 $('connectingOverlay').classList.remove('visible');
                 showView('landing');
             } finally {
+                // 释放异步锁
                 _isJoining = false;
             }
         }
 
+        /**
+         * 通过 MQTT 备用通道加入房间
+         * 当 PeerJS 信令服务器不可用时自动调用
+         * 流程：连接 MQTT（多 broker 依次尝试）-> 订阅主持人主题 -> 发送介绍 -> 建立 WebRTC 连接
+         * @param {string} hostPeerId - 主持人的 PeerJS ID
+         */
+        async function joinRoomViaMQTT(hostPeerId) {
+            showToast('PeerJS 不可用，正在切换备用通道...', 'warning');
+            const connected = await initMQTT();
+            if (!connected) {
+                showToast('所有信令通道均不可用，请检查网络后刷新重试', 'error');
+                $('connectingOverlay').classList.remove('visible');
+                setStatus('连接失败', '');
+                showView('landing');
+                return;
+            }
+
+            // 生成一个临时 ID
+            myPeerId = PEER_PREFIX + generateRoomId() + '-guest';
+            participants.set(myPeerId, { name: myDisplayName, isHost: false, isMicOn: false, isCamOn: false });
+
+            // 订阅主持人的主题（接收主持人的消息）
+            mqttSubscribe(hostPeerId);
+            // 订阅自己的主题（接收其他参会者的消息）
+            mqttSubscribe(myPeerId);
+
+            // 向主持人发送自我介绍
+            mqttSend(hostPeerId, {
+                type: 'introduce',
+                from: myPeerId,
+                data: { name: myDisplayName, isMicOn: false, isCamOn: false }
+            });
+
+            // 添加主持人到参会者列表
+            participants.set(hostPeerId, { name: '主持人', isHost: true, isMicOn: false, isCamOn: false });
+            renderParticipantList();
+            updateParticipantCount();
+
+            // 发起 WebRTC 呼叫
+            setStatus('正在呼叫 (备用通道)...', 'waiting');
+            mqttCall(hostPeerId);
+
+            console.log('[MQTT] 已加入房间:', hostPeerId);
+        }
+
         // ===== 处理新 Data Connection =====
+
+        /**
+         * 处理新的数据通道连接
+         * 当有参会者通过 peer.connect() 连接到自己时触发
+         * 负责注册消息监听、发送参会者列表、转发已有成员信息
+         * @param {DataConnection} conn - PeerJS 数据连接对象
+         */
         function handleNewConnection(conn) {
             conn.on('open', () => {
                 const peerId = conn.peer;
                 if (peers.has(peerId)) {
-                    // 已有连接，更新 conn
+                    // 已有连接（可能是先收到了 call），更新 conn 引用
                     peers.get(peerId).conn = conn;
                 } else {
+                    // 新连接，创建记录
                     peers.set(peerId, { conn, call: null, remoteStream: null });
                 }
 
+                // 注册数据消息监听
                 conn.on('data', (data) => handleDataMessage(peerId, data));
+                // 连接关闭时清理
                 conn.on('close', () => removePeer(peerId));
 
-                // 如果我是主持人，发送完整参会者列表
+                // 如果自己是主持人，向新成员发送完整的参会者列表
                 if (isHost) {
                     const list = {};
                     participants.forEach((v, k) => { list[k] = v; });
                     conn.send({ type: 'participant-list', list });
                 }
 
-                // 向新成员介绍所有已有成员
+                // 向新成员介绍所有已有的其他参会者（mesh 拓扑同步）
                 participants.forEach((info, pid) => {
                     if (pid !== peerId && pid !== myPeerId) {
                         conn.send({ type: 'introduce', data: { name: info.name, isMicOn: info.isMicOn, isCamOn: info.isCamOn } });
@@ -1062,33 +2001,44 @@
         }
 
         // ===== 处理来电 =====
+
+        /**
+         * 处理传入的媒体通话请求
+         * 当有参会者通过 peer.call() 呼叫自己时触发
+         * 检查人数限制后接听，并建立双向数据通道（如果尚未建立）
+         * @param {MediaConnection} call - PeerJS 媒体连接对象
+         */
         function handleIncomingCall(call) {
             const peerId = call.peer;
 
-            // 检查人数限制
+            // 检查是否已达到最大参会人数
             if (participants.size >= MAX_PARTICIPANTS) {
                 showToast('会议已满（最多 ' + MAX_PARTICIPANTS + ' 人）', 'error');
                 call.close();
                 return;
             }
 
+            // 接听通话，传入本地媒体流
             call.answer(localStream);
 
+            // 更新连接记录
             if (peers.has(peerId)) {
                 peers.get(peerId).call = call;
             } else {
                 peers.set(peerId, { conn: null, call, remoteStream: null });
             }
 
+            // 处理远程流
             handleCallStream(call, peerId);
 
-            // 如果没有 data connection，也建立一个
+            // 如果还没有数据通道，主动建立一个（确保双向通信）
             if (!peers.get(peerId)?.conn) {
                 const conn = peer.connect(peerId, { reliable: true });
                 conn.on('open', () => {
                     if (peers.has(peerId)) {
                         peers.get(peerId).conn = conn;
                     }
+                    // 发送自我介绍
                     conn.send({ type: 'introduce', data: { name: myDisplayName, isMicOn, isCamOn } });
                     conn.on('data', (data) => handleDataMessage(peerId, data));
                     conn.on('close', () => removePeer(peerId));
@@ -1097,20 +2047,33 @@
         }
 
         // ===== 处理通话流 =====
+
+        /**
+         * 处理媒体通话的远程流
+         * 当收到对方的视频/音频流时，更新视频元素和 UI
+         * 第一次收到流时，隐藏连接中覆盖层并启动计时器
+         * 设置 30 秒超时，防止连接一直处于等待状态
+         * @param {MediaConnection} call - PeerJS 媒体连接对象
+         * @param {string} peerId - 对应参会者的 PeerJS ID
+         */
         function handleCallStream(call, peerId) {
+            // 收到远程媒体流
             call.on('stream', (remoteStream) => {
+                // 保存远程流引用
                 if (peers.has(peerId)) {
                     peers.get(peerId).remoteStream = remoteStream;
                 }
 
+                // 更新视频元素
                 const videoEl = $('video-' + peerId);
                 if (videoEl) {
                     videoEl.srcObject = remoteStream;
                 }
+                // 隐藏占位符
                 const placeholder = $('placeholder-' + peerId);
                 if (placeholder) placeholder.style.display = 'none';
 
-                // 第一次收到流，进入会议
+                // 第一次收到流：进入会议状态
                 if ($('connectingOverlay').classList.contains('visible')) {
                     $('connectingOverlay').classList.remove('visible');
                     showView('meeting');
@@ -1119,18 +2082,21 @@
                     showToast('连接成功', 'success');
                 }
 
+                // 刷新视频网格和参会者列表
                 renderVideoGrid();
                 renderParticipantList();
                 updateParticipantCount();
             });
 
+            // 通话关闭时清理该参会者
             call.on('close', () => removePeer(peerId));
+            // 通话出错时清理该参会者
             call.on('error', (err) => {
                 console.error('Call error:', err);
                 removePeer(peerId);
             });
 
-            // 超时
+            // 连接超时保护：30秒内未收到流则自动挂断
             setTimeout(() => {
                 if ($('connectingOverlay').classList.contains('visible')) {
                     $('connectingOverlay').classList.remove('visible');
@@ -1141,32 +2107,49 @@
         }
 
         // ===== 移除 Peer =====
+
+        /**
+         * 移除指定参会者
+         * 关闭与该参会者的所有连接，从列表中移除，刷新 UI
+         * 如果只剩自己一人，停止通话计时器
+         * @param {string} peerId - 要移除的参会者 PeerJS ID
+         */
         function removePeer(peerId) {
             const info = participants.get(peerId);
             if (info) showToast(`${info.name} 离开了会议`);
+            // 关闭媒体连接和数据连接
             const data = peers.get(peerId);
             if (data) {
                 if (data.call) data.call.close();
                 if (data.conn) data.conn.close();
             }
+            // 从映射中删除
             peers.delete(peerId);
             participants.delete(peerId);
+            // 刷新 UI
             renderVideoGrid();
             renderParticipantList();
             updateParticipantCount();
 
-            // 如果所有人都走了
+            // 如果只剩自己一人且通话已开始，停止计时器
             if (participants.size <= 1 && callStartTime) {
                 stopTimer();
             }
         }
 
         // ===== 挂断 =====
+
+        /**
+         * 挂断通话并重置所有状态
+         * 关闭所有连接、停止媒体流、销毁 PeerJS 实例
+         * 重置所有状态变量和 UI 元素，返回着陆页
+         */
         function hangUp() {
             stopTimer();
             $('connectingOverlay').classList.remove('visible');
             $('sidebar').classList.remove('visible');
 
+            // 关闭所有 peer 连接
             peers.forEach(({ call, conn }) => {
                 if (call) call.close();
                 if (conn) conn.close();
@@ -1174,12 +2157,25 @@
             peers.clear();
             participants.clear();
 
+            // 停止本地媒体流的所有轨道
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
                 localStream = new MediaStream();
             }
+            // 销毁 PeerJS 实例
             if (peer) { peer.destroy(); peer = null; }
 
+            // 断开 MQTT 备用通道
+            if (mqttClient) {
+                mqttClient.end(true);
+                mqttClient = null;
+            }
+            mqttPeers.forEach(({ pc }) => pc.close());
+            mqttPeers.clear();
+            signalingMode = 'peerjs';
+            clearTimeout(peerjsTimeout);
+
+            // 重置所有状态变量
             isMicOn = false;
             isCamOn = false;
             isHost = false;
@@ -1190,22 +2186,35 @@
             _isCreating = false;
             _isJoining = false;
 
+            // 重置控制按钮 UI
             $('micBtn').classList.remove('active');
             $('micBtn').innerHTML = '🔇<span class="tooltip">麦克风已关闭</span>';
             $('camBtn').classList.remove('active');
             $('camBtn').innerHTML = '🚫<span class="tooltip">摄像头已关闭</span>';
 
+            // 返回着陆页
             showView('landing');
             setStatus('未连接', '');
+            // 清除 URL 中的 hash
             history.replaceState(null, '', window.location.pathname);
         }
 
         // ===== 侧边栏 =====
+
+        /**
+         * 切换参会者侧边栏的显示/隐藏
+         */
         function toggleSidebar() {
             $('sidebar').classList.toggle('visible');
         }
 
         // ===== 复制链接 =====
+
+        /**
+         * 复制房间链接到剪贴板
+         * 优先使用 Clipboard API，失败时回退到 execCommand
+         * 复制成功后按钮文字临时变为"已复制"
+         */
         async function copyLink() {
             try {
                 await navigator.clipboard.writeText($('shareLink').value);
@@ -1213,8 +2222,10 @@
                 btn.textContent = '已复制 ✓';
                 btn.classList.add('copied');
                 showToast('链接已复制', 'success');
+                // 2秒后恢复按钮文字
                 setTimeout(() => { btn.textContent = '复制链接'; btn.classList.remove('copied'); }, 2000);
             } catch {
+                // Clipboard API 不可用时的降级方案
                 $('shareLink').select();
                 document.execCommand('copy');
                 showToast('链接已复制', 'success');
@@ -1222,6 +2233,8 @@
         }
 
         // ===== 初始化 =====
+
+        // 页面加载完成后，检查 URL hash 是否包含房间链接，自动加入
         window.addEventListener('load', () => {
             const hash = window.location.hash.slice(1);
             if (hash && hash.startsWith(PEER_PREFIX)) {
@@ -1229,6 +2242,7 @@
             }
         });
 
+        // 页面关闭前自动挂断，释放资源
         window.addEventListener('beforeunload', () => hangUp());
     </script>
 </body>
