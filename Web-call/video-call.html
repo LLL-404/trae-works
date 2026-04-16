@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaceLink · 视频通话与会议</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --accent: #00e5a0;
+            --accent-dim: rgba(0, 229, 160, 0.15);
+            --accent-glow: rgba(0, 229, 160, 0.4);
+            --text-primary: #f0f4f8;
+            --text-secondary: #8899aa;
+            --text-muted: #4a5568;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --border: rgba(255, 255, 255, 0.06);
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+        html, body {
+            height: 100%;
+            font-family: 'Noto Sans SC', 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        /* ===== 背景 ===== */
+        .bg-atmosphere { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .bg-atmosphere::before {
+            content: ''; position: absolute; width: 600px; height: 600px; top: -200px; right: -100px;
+            background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, transparent 70%);
+            animation: floatBlob 20s ease-in-out infinite;
+        }
+        .bg-atmosphere::after {
+            content: ''; position: absolute; width: 500px; height: 500px; bottom: -150px; left: -100px;
+            background: radial-gradient(circle, rgba(0,150,255,0.06) 0%, transparent 70%);
+            animation: floatBlob 25s ease-in-out infinite reverse;
+        }
+        @keyframes floatBlob {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -40px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+        .bg-grid {
+            position: fixed; inset: 0; z-index: 0;
+            background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 60px 60px; pointer-events: none;
+        }
+
+        /* ===== 布局 ===== */
+        .app { position: relative; z-index: 1; height: 100vh; display: flex; flex-direction: column; }
+
+        /* ===== 顶栏 ===== */
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 20px;
+            backdrop-filter: blur(20px); background: rgba(10, 14, 23, 0.6);
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { display: flex; align-items: center; gap: 10px; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.15rem; letter-spacing: -0.5px; }
+        .logo-icon {
+            width: 34px; height: 34px; border-radius: 9px;
+            background: linear-gradient(135deg, var(--accent), #00b4d8);
+            display: flex; align-items: center; justify-content: center; font-size: 1rem;
+        }
+        .topbar-right { display: flex; align-items: center; gap: 10px; }
+        .status-badge {
+            display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary);
+            padding: 5px 12px; border-radius: 20px; background: var(--bg-card); border: 1px solid var(--border);
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); transition: background 0.3s; }
+        .status-dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+        .status-dot.waiting { background: var(--warning); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .participants-badge {
+            display: none; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--accent);
+            padding: 5px 12px; border-radius: 20px; background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.2);
+        }
+        .participants-badge.visible { display: flex; }
+        .host-badge {
+            display: none; font-size: 0.7rem; color: var(--warning); padding: 3px 8px; border-radius: 10px;
+            background: rgba(255,165,2,0.12); border: 1px solid rgba(255,165,2,0.25);
+        }
+        .host-badge.visible { display: inline-flex; align-items: center; gap: 3px; }
+
+        /* ===== 主区域 ===== */
+        .main-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; position: relative; overflow: hidden; }
+
+        /* ===== 着陆页 ===== */
+        .landing { display: flex; flex-direction: column; align-items: center; gap: 28px; max-width: 560px; width: 100%; animation: fadeUp 0.8s ease-out; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .landing-hero { text-align: center; }
+        .landing-hero h1 {
+            font-family: 'Outfit', sans-serif; font-size: 2.6rem; font-weight: 700;
+            letter-spacing: -1.5px; line-height: 1.15; margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--text-primary) 40%, var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .landing-hero p { color: var(--text-secondary); font-size: 1rem; line-height: 1.6; }
+
+        .mode-selector { display: flex; gap: 12px; width: 100%; }
+        .mode-card {
+            flex: 1; padding: 20px 16px; border-radius: var(--radius); background: var(--bg-card);
+            border: 2px solid var(--border); backdrop-filter: blur(12px); cursor: pointer;
+            transition: all 0.3s ease; text-align: center;
+        }
+        .mode-card:hover { border-color: rgba(0,229,160,0.3); background: var(--accent-dim); transform: translateY(-2px); }
+        .mode-card.selected { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 4px 20px rgba(0,229,160,0.1); }
+        .mode-card-icon { font-size: 2rem; margin-bottom: 8px; line-height: 1; }
+        .mode-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+        .mode-card p { font-size: 0.75rem; color: var(--text-secondary); }
+
+        .action-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+        .action-card {
+            padding: 20px 16px; border-radius: var(--radius); background: var(--bg-card);
+            border: 1px solid var(--border); backdrop-filter: blur(12px); cursor: pointer;
+            transition: all 0.3s ease; text-align: center;
+        }
+        .action-card:hover { border-color: var(--accent); background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,229,160,0.1); }
+        .action-card.primary {
+            grid-column: 1 / -1; padding: 24px;
+            background: linear-gradient(135deg, rgba(0,229,160,0.12), rgba(0,180,216,0.08));
+            border-color: rgba(0, 229, 160, 0.2);
+        }
+        .action-card.primary:hover { border-color: var(--accent); box-shadow: 0 8px 40px rgba(0, 229, 160, 0.15); }
+        .action-card-icon { font-size: 1.8rem; margin-bottom: 8px; line-height: 1; }
+        .action-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 3px; }
+        .action-card p { font-size: 0.78rem; color: var(--text-secondary); }
+
+        /* ===== 分享面板 ===== */
+        .share-panel { display: none; flex-direction: column; align-items: center; gap: 18px; max-width: 520px; width: 100%; animation: fadeUp 0.5s ease-out; }
+        .share-panel.visible { display: flex; }
+        .share-panel h2 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 600; text-align: center; }
+        .share-box {
+            width: 100%; padding: 14px 16px; border-radius: var(--radius-sm);
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .share-box input { flex: 1; background: none; border: none; color: var(--accent); font-size: 0.82rem; font-family: 'Outfit', monospace; outline: none; }
+        .share-box button {
+            padding: 7px 16px; border: none; border-radius: 8px; background: var(--accent);
+            color: var(--bg-primary); font-weight: 600; font-size: 0.82rem; cursor: pointer;
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .share-box button:hover { opacity: 0.85; }
+        .share-box button.copied { background: var(--text-secondary); }
+        .room-info { display: flex; align-items: center; gap: 16px; color: var(--text-muted); font-size: 0.82rem; }
+        .room-info span:first-child { color: var(--text-secondary); }
+        .room-info .room-id { color: var(--accent); font-family: 'Outfit', monospace; font-weight: 600; font-size: 1.05rem; letter-spacing: 2px; }
+        .waiting-indicator { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 0.88rem; }
+        .waiting-dots span {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent); margin: 0 2px; animation: bounce 1.4s ease-in-out infinite;
+        }
+        .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+
+        /* ===== 会议视图 ===== */
+        .meeting-view { display: none; width: 100%; height: 100%; position: relative; animation: fadeIn 0.5s ease; }
+        .meeting-view.visible { display: flex; flex-direction: column; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 视频网格 */
+        .video-grid {
+            flex: 1; display: grid; gap: 8px; padding: 8px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-rows: repeat(auto-fit, minmax(200px, 1fr));
+            align-content: center; overflow: hidden;
+        }
+        .video-grid.grid-1 { grid-template-columns: 1fr; }
+        .video-grid.grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .video-grid.grid-3 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
+        .video-grid.grid-4 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
+        .video-grid.grid-5, .video-grid.grid-6 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
+
+        .video-tile {
+            position: relative; border-radius: var(--radius); overflow: hidden;
+            background: var(--bg-secondary); border: 2px solid transparent;
+            transition: border-color 0.3s;
+        }
+        .video-tile.speaking { border-color: var(--accent); }
+        .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+        .video-tile.local-tile video { transform: scaleX(-1); }
+        .video-tile-placeholder {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px; color: var(--text-muted);
+        }
+        .video-tile-placeholder .avatar {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            border: 2px solid var(--border);
+            display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+        }
+        .video-tile-placeholder p { font-size: 0.82rem; }
+        .tile-label {
+            position: absolute; bottom: 8px; left: 10px; display: flex; align-items: center; gap: 6px;
+            font-size: 0.75rem; color: white; background: rgba(0,0,0,0.55); padding: 3px 10px; border-radius: 6px;
+            backdrop-filter: blur(4px);
+        }
+        .tile-label .host-tag {
+            font-size: 0.65rem; color: var(--warning); background: rgba(255,165,2,0.2);
+            padding: 1px 5px; border-radius: 4px;
+        }
+        .tile-mic-off {
+            position: absolute; top: 10px; right: 10px; width: 28px; height: 28px;
+            border-radius: 50%; background: rgba(255,71,87,0.8); display: flex;
+            align-items: center; justify-content: center; font-size: 0.8rem;
+        }
+
+        /* 通话计时器 */
+        .call-timer {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            padding: 6px 16px; border-radius: 20px; background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px); font-family: 'Outfit', monospace;
+            font-size: 0.88rem; font-weight: 500; color: var(--text-primary); z-index: 10; display: none;
+        }
+        .call-timer.visible { display: block; }
+
+        /* 连接中覆盖层 */
+        .connecting-overlay {
+            display: none; position: absolute; inset: 0; background: rgba(10, 14, 23, 0.85);
+            backdrop-filter: blur(8px); z-index: 20; flex-direction: column;
+            align-items: center; justify-content: center; gap: 18px;
+        }
+        .connecting-overlay.visible { display: flex; }
+        .connecting-spinner {
+            width: 44px; height: 44px; border: 3px solid var(--border);
+            border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .connecting-overlay p { color: var(--text-secondary); font-size: 0.92rem; }
+
+        /* ===== 参会者面板 ===== */
+        .sidebar {
+            display: none; position: absolute; top: 0; right: 0; width: 280px; height: 100%;
+            background: rgba(10, 14, 23, 0.92); backdrop-filter: blur(20px);
+            border-left: 1px solid var(--border); z-index: 30;
+            flex-direction: column; animation: slideInRight 0.3s ease;
+        }
+        .sidebar.visible { display: flex; }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .sidebar-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px; border-bottom: 1px solid var(--border);
+        }
+        .sidebar-header h3 { font-size: 0.95rem; font-weight: 600; }
+        .sidebar-close {
+            width: 30px; height: 30px; border: none; border-radius: 8px;
+            background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 1rem;
+        }
+        .sidebar-close:hover { background: rgba(255,255,255,0.1); }
+        .participant-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .participant-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-radius: var(--radius-sm); transition: background 0.2s;
+        }
+        .participant-item:hover { background: rgba(255,255,255,0.04); }
+        .participant-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0;
+        }
+        .participant-info { flex: 1; min-width: 0; }
+        .participant-name { font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+        .participant-name .host-tag { font-size: 0.6rem; color: var(--warning); background: rgba(255,165,2,0.15); padding: 1px 5px; border-radius: 3px; }
+        .participant-status { font-size: 0.72rem; color: var(--text-muted); }
+        .participant-actions { display: flex; gap: 4px; }
+        .participant-actions button {
+            width: 28px; height: 28px; border: none; border-radius: 6px;
+            background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+        .participant-actions button:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .participant-actions button.danger:hover { background: rgba(255,71,87,0.2); color: var(--danger); }
+
+        /* ===== 控制栏 ===== */
+        .controls {
+            display: none; align-items: center; justify-content: center; gap: 12px;
+            padding: 14px 20px; backdrop-filter: blur(20px); background: rgba(10, 14, 23, 0.7);
+            border-top: 1px solid var(--border);
+        }
+        .controls.visible { display: flex; }
+        .ctrl-btn {
+            width: 52px; height: 52px; border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; cursor: pointer; transition: all 0.2s ease; position: relative;
+        }
+        .ctrl-btn.default {
+            background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border);
+        }
+        .ctrl-btn.default:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
+        .ctrl-btn.default.active { background: rgba(255,255,255,0.15); color: var(--accent); border-color: var(--accent); }
+        .ctrl-btn.end { background: var(--danger); color: white; width: 58px; height: 58px; font-size: 1.4rem; }
+        .ctrl-btn.end:hover { background: #e84057; transform: scale(1.08); box-shadow: 0 4px 20px rgba(255, 71, 87, 0.4); }
+        .ctrl-btn .tooltip {
+            position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+            padding: 4px 10px; border-radius: 6px; background: rgba(0,0,0,0.8);
+            color: var(--text-primary); font-size: 0.7rem; white-space: nowrap;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .ctrl-btn:hover .tooltip { opacity: 1; }
+
+        /* ===== Toast ===== */
+        .toast-container { position: fixed; top: 70px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        .toast {
+            padding: 10px 18px; border-radius: var(--radius-sm); background: var(--bg-card);
+            border: 1px solid var(--border); backdrop-filter: blur(12px); color: var(--text-primary);
+            font-size: 0.82rem; animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards; max-width: 300px;
+        }
+        .toast.success { border-color: var(--accent); }
+        .toast.error { border-color: var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 600px) {
+            .landing-hero h1 { font-size: 1.8rem; }
+            .mode-selector { flex-direction: column; }
+            .action-cards { grid-template-columns: 1fr; }
+            .video-grid { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
+            .sidebar { width: 100%; }
+            .ctrl-btn { width: 46px; height: 46px; font-size: 1rem; }
+            .ctrl-btn.end { width: 52px; height: 52px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-atmosphere"></div>
+    <div class="bg-grid"></div>
+
+    <div class="app">
+        <!-- 顶栏 -->
+        <div class="topbar">
+            <div class="logo">
+                <div class="logo-icon">🔗</div>
+                <span>FaceLink</span>
+            </div>
+            <div class="topbar-right">
+                <span class="host-badge" id="hostBadge">👑 主持人</span>
+                <div class="participants-badge" id="participantsBadge">
+                    👥 <span id="participantCount">0</span> 人
+                </div>
+                <div class="status-badge">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">未连接</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主区域 -->
+        <div class="main-area">
+            <!-- 着陆页 -->
+            <div class="landing" id="landing">
+                <div class="landing-hero">
+                    <h1>视频通话与会议</h1>
+                    <p>无需注册，无需安装，发送链接即可开始<br>支持私密通话与多人会议，端对端加密</p>
+                </div>
+                <div class="mode-selector">
+                    <div class="mode-card selected" id="modePrivate" onclick="selectMode('private')">
+                        <div class="mode-card-icon">🤝</div>
+                        <h3>私密通话</h3>
+                        <p>1对1 面对面视频通话</p>
+                    </div>
+                    <div class="mode-card" id="modeMeeting" onclick="selectMode('meeting')">
+                        <div class="mode-card-icon">👥</div>
+                        <h3>多人会议</h3>
+                        <p>最多6人，主持人管理</p>
+                    </div>
+                </div>
+                <div class="action-cards">
+                    <div class="action-card primary" onclick="createRoom()">
+                        <div class="action-card-icon">📞</div>
+                        <h3 id="createBtnText">创建通话房间</h3>
+                        <p id="createBtnDesc">生成链接发给对方，等待对方加入</p>
+                    </div>
+                    <div class="action-card" onclick="joinByCode()">
+                        <div class="action-card-icon">🔑</div>
+                        <h3>输入房间号</h3>
+                        <p>输入对方提供的房间号加入</p>
+                    </div>
+                    <div class="action-card" onclick="joinByClipboard()">
+                        <div class="action-card-icon">📋</div>
+                        <h3>粘贴链接加入</h3>
+                        <p>从剪贴板读取链接直接加入</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分享面板 -->
+            <div class="share-panel" id="sharePanel">
+                <h2 id="shareTitle">🔗 等待对方加入</h2>
+                <p style="color: var(--text-secondary); text-align: center;" id="shareDesc">将以下链接发送给对方，对方打开即可通话</p>
+                <div class="share-box">
+                    <input type="text" id="shareLink" readonly>
+                    <button id="copyBtn" onclick="copyLink()">复制链接</button>
+                </div>
+                <div class="room-info">
+                    <span>房间号：</span>
+                    <span class="room-id" id="roomIdDisplay"></span>
+                </div>
+                <div class="waiting-indicator">
+                    <div class="waiting-dots"><span></span><span></span><span></span></div>
+                    <span>等待连接中...</span>
+                </div>
+            </div>
+
+            <!-- 会议视图 -->
+            <div class="meeting-view" id="meetingView">
+                <div class="video-grid grid-1" id="videoGrid"></div>
+                <div class="call-timer" id="callTimer">00:00</div>
+                <div class="connecting-overlay" id="connectingOverlay">
+                    <div class="connecting-spinner"></div>
+                    <p>正在建立连接...</p>
+                </div>
+                <!-- 参会者面板 -->
+                <div class="sidebar" id="sidebar">
+                    <div class="sidebar-header">
+                        <h3>参会者 (<span id="sidebarCount">0</span>)</h3>
+                        <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+                    </div>
+                    <div class="participant-list" id="participantList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 控制栏 -->
+        <div class="controls" id="controls">
+            <button class="ctrl-btn default" id="micBtn" onclick="toggleMic()">
+                🔇<span class="tooltip">麦克风已关闭</span>
+            </button>
+            <button class="ctrl-btn default" id="camBtn" onclick="toggleCam()">
+                🚫<span class="tooltip">摄像头已关闭</span>
+            </button>
+            <button class="ctrl-btn default" id="sidebarBtn" onclick="toggleSidebar()">
+                👥<span class="tooltip">参会者</span>
+            </button>
+            <button class="ctrl-btn end" onclick="hangUp()">
+                📞<span class="tooltip">挂断</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ===== 常量 =====
+        const MAX_PARTICIPANTS = 6;
+        const PEER_PREFIX = 'facelink-';
+
+        // ===== 状态 =====
+        let peer = null;
+        let localStream = new MediaStream();
+        let isHost = false;
+        let roomId = null;
+        let myPeerId = null;
+        let myDisplayName = '';
+        let isMicOn = false;
+        let isCamOn = false;
+        let callTimerInterval = null;
+        let callStartTime = null;
+        let mode = 'private'; // 'private' | 'meeting'
+        let _isTogglingMic = false;
+        let _isTogglingCam = false;
+        let _isCreating = false;
+        let _isJoining = false;
+
+        // 连接管理：key=peerId, value={call, conn, name, isMicOn, isCamOn}
+        let peers = new Map();
+        // 参会者列表（包含自己）：key=peerId, value={name, isHost, isMicOn, isCamOn}
+        let participants = new Map();
+
+        // ===== DOM =====
+        const $ = id => document.getElementById(id);
+
+        // ===== 工具函数 =====
+        function generateRoomId() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let id = '';
+            for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+            return id;
+        }
+
+        function generateName() {
+            const adjectives = ['快乐的', '聪明的', '勇敢的', '活泼的', '安静的', '温暖的'];
+            const nouns = ['小熊', '小猫', '小兔', '小鸟', '小鱼', '小虎'];
+            return adjectives[Math.floor(Math.random() * adjectives.length)] + nouns[Math.floor(Math.random() * nouns.length)];
+        }
+
+        function showToast(msg, type = 'info') {
+            const c = $('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        function setStatus(text, state) {
+            $('statusText').textContent = text;
+            $('statusDot').className = 'status-dot ' + (state || '');
+        }
+
+        function showView(view) {
+            $('landing').style.display = 'none';
+            $('sharePanel').classList.remove('visible');
+            $('meetingView').classList.remove('visible');
+            $('controls').classList.remove('visible');
+            $('hostBadge').classList.remove('visible');
+            $('participantsBadge').classList.remove('visible');
+
+            if (view === 'landing') $('landing').style.display = 'flex';
+            if (view === 'share') $('sharePanel').classList.add('visible');
+            if (view === 'meeting') {
+                $('meetingView').classList.add('visible');
+                $('controls').classList.add('visible');
+                $('participantsBadge').classList.add('visible');
+                if (isHost) $('hostBadge').classList.add('visible');
+            }
+        }
+
+        function updateParticipantCount() {
+            const count = participants.size;
+            $('participantCount').textContent = count;
+            $('sidebarCount').textContent = count;
+        }
+
+        function startTimer() {
+            callStartTime = Date.now();
+            $('callTimer').classList.add('visible');
+            callTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+                const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                const s = String(elapsed % 60).padStart(2, '0');
+                $('callTimer').textContent = `${m}:${s}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(callTimerInterval);
+            $('callTimer').classList.remove('visible');
+            $('callTimer').textContent = '00:00';
+        }
+
+        // ===== 模式选择 =====
+        function selectMode(m) {
+            mode = m;
+            $('modePrivate').classList.toggle('selected', m === 'private');
+            $('modeMeeting').classList.toggle('selected', m === 'meeting');
+            $('createBtnText').textContent = m === 'private' ? '创建通话房间' : '创建会议房间';
+            $('createBtnDesc').textContent = m === 'private'
+                ? '生成链接发给对方，等待对方加入'
+                : '生成链接邀请多人加入，你将成为主持人';
+        }
+
+        // ===== 媒体管理 =====
+        async function toggleMic() {
+            if (_isTogglingMic) return;
+            _isTogglingMic = true;
+            const btn = $('micBtn');
+            try {
+                if (isMicOn) {
+                    localStream.getAudioTracks().forEach(t => { localStream.removeTrack(t); t.stop(); });
+                    isMicOn = false;
+                    btn.classList.remove('active');
+                    btn.innerHTML = '🔇<span class="tooltip">麦克风已关闭</span>';
+                    showToast('麦克风已关闭');
+                } else {
+                    const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+                    const track = s.getAudioTracks()[0];
+                    localStream.addTrack(track);
+                    isMicOn = true;
+                    btn.classList.add('active');
+                    btn.innerHTML = '🎤<span class="tooltip">麦克风</span>';
+                    showToast('麦克风已开启');
+                    replaceTrackForAll(track, 'audio');
+                }
+                participants.set(myPeerId, { name: myDisplayName, isHost: isHost, isMicOn, isCamOn });
+                broadcastState();
+                renderVideoGrid();
+                renderParticipantList();
+            } catch (e) {
+                showToast('麦克风操作失败', 'error');
+            } finally {
+                _isTogglingMic = false;
+            }
+        }
+
+        async function toggleCam() {
+            if (_isTogglingCam) return;
+            _isTogglingCam = true;
+            const btn = $('camBtn');
+            try {
+                if (isCamOn) {
+                    localStream.getVideoTracks().forEach(t => { localStream.removeTrack(t); t.stop(); });
+                    isCamOn = false;
+                    btn.classList.remove('active');
+                    btn.innerHTML = '🚫<span class="tooltip">摄像头已关闭</span>';
+                    showToast('摄像头已关闭');
+                    $('localVideo') && ($('localVideo').srcObject = null);
+                } else {
+                    const s = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } });
+                    const track = s.getVideoTracks()[0];
+                    localStream.addTrack(track);
+                    isCamOn = true;
+                    btn.classList.add('active');
+                    btn.innerHTML = '📷<span class="tooltip">摄像头</span>';
+                    showToast('摄像头已开启');
+                    replaceTrackForAll(track, 'video');
+                }
+                participants.set(myPeerId, { name: myDisplayName, isHost: isHost, isMicOn, isCamOn });
+                broadcastState();
+                renderVideoGrid();
+                renderParticipantList();
+            } catch (e) {
+                showToast('摄像头操作失败', 'error');
+            } finally {
+                _isTogglingCam = false;
+            }
+        }
+
+        function replaceTrackForAll(newTrack, kind) {
+            peers.forEach(({ call }) => {
+                if (!call || !call.peerConnection) return;
+                const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === kind);
+                if (sender) sender.replaceTrack(newTrack).catch(e => console.error('替换轨道失败:', e));
+            });
+        }
+
+        // ===== 视频网格渲染 =====
+        function renderVideoGrid() {
+            const grid = $('videoGrid');
+            grid.innerHTML = '';
+
+            // 确定网格布局
+            const count = participants.size;
+            grid.className = 'video-grid';
+            if (count <= 1) grid.classList.add('grid-1');
+            else if (count === 2) grid.classList.add('grid-2');
+            else if (count <= 4) grid.classList.add('grid-4');
+            else grid.classList.add('grid-' + Math.min(count, 6));
+
+            // 先渲染自己
+            const myInfo = participants.get(myPeerId);
+            grid.appendChild(createVideoTile(myPeerId, myInfo, true));
+
+            // 渲染其他人
+            participants.forEach((info, peerId) => {
+                if (peerId === myPeerId) return;
+                grid.appendChild(createVideoTile(peerId, info, false));
+            });
+        }
+
+        function createVideoTile(peerId, info, isLocal) {
+            const tile = document.createElement('div');
+            tile.className = 'video-tile' + (isLocal ? ' local-tile' : '');
+            tile.id = 'tile-' + peerId;
+
+            const video = document.createElement('video');
+            video.id = 'video-' + peerId;
+            video.autoplay = true;
+            video.playsinline = true;
+
+            if (isLocal && isCamOn) {
+                video.srcObject = localStream;
+            } else if (!isLocal && peers.has(peerId)) {
+                video.srcObject = peers.get(peerId).remoteStream || null;
+            }
+
+            tile.appendChild(video);
+
+            // 占位符（无视频时显示）
+            const placeholder = document.createElement('div');
+            placeholder.className = 'video-tile-placeholder';
+            placeholder.id = 'placeholder-' + peerId;
+            if (isLocal && !isCamOn || !isLocal && (!peers.has(peerId) || !peers.get(peerId).remoteStream)) {
+                placeholder.style.display = 'flex';
+            } else {
+                placeholder.style.display = 'none';
+            }
+            placeholder.innerHTML = `<div class="avatar">${isLocal ? '😊' : '👤'}</div><p>${info ? info.name : '等待中...'}</p>`;
+            tile.appendChild(placeholder);
+
+            // 标签
+            const label = document.createElement('div');
+            label.className = 'tile-label';
+            let labelHTML = (info ? info.name : '未知');
+            if (info && info.isHost) labelHTML += ' <span class="host-tag">👑 主持</span>';
+            label.innerHTML = labelHTML;
+            tile.appendChild(label);
+
+            // 麦克风关闭图标
+            if (info && !info.isMicOn) {
+                const micOff = document.createElement('div');
+                micOff.className = 'tile-mic-off';
+                micOff.textContent = '🔇';
+                tile.appendChild(micOff);
+            }
+
+            return tile;
+        }
+
+        // ===== 参会者列表渲染 =====
+        function renderParticipantList() {
+            const list = $('participantList');
+            list.innerHTML = '';
+
+            participants.forEach((info, peerId) => {
+                const item = document.createElement('div');
+                item.className = 'participant-item';
+
+                const avatar = document.createElement('div');
+                avatar.className = 'participant-avatar';
+                avatar.textContent = peerId === myPeerId ? '😊' : '👤';
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'participant-info';
+                let nameHTML = info.name;
+                if (info.isHost) nameHTML += ' <span class="host-tag">👑 主持</span>';
+                if (peerId === myPeerId) nameHTML += ' <span class="host-tag" style="color:var(--accent);background:var(--accent-dim);">我</span>';
+                infoDiv.innerHTML = `<div class="participant-name">${nameHTML}</div>
+                    <div class="participant-status">${!info.isMicOn ? '🔇 麦克风关闭' : '🎤 麦克风开启'} · ${!info.isCamOn ? '📷 摄像头关闭' : '📹 摄像头开启'}</div>`;
+
+                item.appendChild(avatar);
+                item.appendChild(infoDiv);
+
+                // 主持人操作按钮
+                if (isHost && peerId !== myPeerId) {
+                    const actions = document.createElement('div');
+                    actions.className = 'participant-actions';
+
+                    const muteBtn = document.createElement('button');
+                    muteBtn.textContent = '🔇';
+                    muteBtn.title = '请求静音';
+                    muteBtn.onclick = () => requestMute(peerId);
+                    actions.appendChild(muteBtn);
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '✕';
+                    removeBtn.className = 'danger';
+                    removeBtn.title = '移出会议';
+                    removeBtn.onclick = () => removeParticipant(peerId);
+                    actions.appendChild(removeBtn);
+
+                    item.appendChild(actions);
+                }
+
+                list.appendChild(item);
+            });
+        }
+
+        // ===== 主持人功能 =====
+        function requestMute(peerId) {
+            if (!isHost || !peers.has(peerId)) return;
+            const conn = peers.get(peerId).conn;
+            if (conn && conn.open) {
+                conn.send({ type: 'host-mute' });
+                showToast(`已请求 ${participants.get(peerId)?.name || '对方'} 静音`);
+            }
+        }
+
+        function removeParticipant(peerId) {
+            if (!isHost || !peers.has(peerId)) return;
+            const conn = peers.get(peerId).conn;
+            if (conn && conn.open) {
+                conn.send({ type: 'host-remove' });
+            }
+            // 关闭与该参与者的连接
+            const peerData = peers.get(peerId);
+            if (peerData) {
+                if (peerData.call) peerData.call.close();
+                if (peerData.conn) peerData.conn.close();
+            }
+            peers.delete(peerId);
+            participants.delete(peerId);
+            renderVideoGrid();
+            renderParticipantList();
+            updateParticipantCount();
+            showToast(`已移出 ${participants.get(peerId)?.name || '参会者'}`);
+            // 广播更新
+            broadcastParticipantList();
+        }
+
+        // ===== 信令广播 =====
+        function broadcastState() {
+            const state = { type: 'state-update', peerId: myPeerId, data: { name: myDisplayName, isHost, isMicOn, isCamOn } };
+            peers.forEach(({ conn }) => {
+                if (conn && conn.open) conn.send(state);
+            });
+        }
+
+        function broadcastParticipantList() {
+            const list = {};
+            participants.forEach((v, k) => { list[k] = v; });
+            const msg = { type: 'participant-list', list };
+            peers.forEach(({ conn }) => {
+                if (conn && conn.open) conn.send(msg);
+            });
+        }
+
+        // ===== Data Channel 消息处理 =====
+        function handleDataMessage(peerId, data) {
+            switch (data.type) {
+                case 'state-update':
+                    if (participants.has(data.peerId)) {
+                        participants.set(data.peerId, { ...participants.get(data.peerId), ...data.data });
+                        renderVideoGrid();
+                        renderParticipantList();
+                    }
+                    break;
+
+                case 'participant-list':
+                    // 从主持人获取完整参会者列表
+                    Object.entries(data.list).forEach(([k, v]) => {
+                        if (k !== myPeerId && !participants.has(k)) {
+                            participants.set(k, v);
+                        }
+                    });
+                    renderVideoGrid();
+                    renderParticipantList();
+                    updateParticipantCount();
+                    break;
+
+                case 'host-mute':
+                    showToast('主持人请求你静音', 'error');
+                    // 自动关闭麦克风
+                    if (isMicOn) toggleMic();
+                    break;
+
+                case 'host-remove':
+                    showToast('你已被主持人移出会议', 'error');
+                    hangUp();
+                    break;
+
+                case 'introduce':
+                    // 新成员自我介绍，通知所有人
+                    const newInfo = data.data;
+                    if (!participants.has(peerId)) {
+                        participants.set(peerId, { name: newInfo.name, isHost: false, isMicOn: newInfo.isMicOn, isCamOn: newInfo.isCamOn });
+                        renderVideoGrid();
+                        renderParticipantList();
+                        updateParticipantCount();
+                        showToast(`${newInfo.name} 加入了会议`);
+                    }
+                    // 转发给其他peer
+                    peers.forEach(({ conn }, pid) => {
+                        if (pid !== peerId && conn && conn.open) conn.send(data);
+                    });
+                    // 如果是主持人，发送完整列表给新成员
+                    if (isHost) {
+                        const list = {};
+                        participants.forEach((v, k) => { list[k] = v; });
+                        const conn = peers.get(peerId)?.conn;
+                        if (conn && conn.open) conn.send({ type: 'participant-list', list });
+                    }
+                    break;
+            }
+        }
+
+        // ===== 创建房间 =====
+        async function createRoom() {
+            if (_isCreating) return;
+            _isCreating = true;
+            roomId = generateRoomId();
+            isHost = true;
+            myDisplayName = generateName();
+            myPeerId = PEER_PREFIX + roomId + '-host';
+
+            localStream = new MediaStream();
+            participants.set(myPeerId, { name: myDisplayName, isHost: true, isMicOn: false, isCamOn: false });
+
+            setStatus('正在连接...', 'waiting');
+
+            try {
+                peer = new Peer(myPeerId, { debug: 0 });
+
+                peer.on('open', (id) => {
+                    setStatus('等待加入', 'waiting');
+                    const link = window.location.origin + window.location.pathname + '#' + id;
+                    $('shareLink').value = link;
+                    $('roomIdDisplay').textContent = roomId;
+                    $('shareTitle').textContent = mode === 'private' ? '🔗 等待对方加入' : '🔗 等待参会者加入';
+                    $('shareDesc').textContent = mode === 'private'
+                        ? '将以下链接发送给对方，对方打开即可通话'
+                        : '将以下链接发送给参会者，最多支持 ' + MAX_PARTICIPANTS + ' 人';
+                    showView('share');
+                    showToast(mode === 'private' ? '房间创建成功' : '会议创建成功，你是主持人', 'success');
+                });
+
+                peer.on('connection', (conn) => {
+                    handleNewConnection(conn);
+                });
+
+                peer.on('call', (call) => {
+                    handleIncomingCall(call);
+                });
+
+                peer.on('error', (err) => {
+                    console.error('PeerJS error:', err);
+                    if (err.type === 'unavailable-id') {
+                        showToast('房间号冲突，请重试', 'error');
+                        peer.destroy();
+                        setStatus('连接失败', '');
+                    } else {
+                        showToast('连接错误: ' + err.type, 'error');
+                    }
+                });
+            } catch (e) {
+                showToast('创建失败，请检查网络', 'error');
+            } finally {
+                _isCreating = false;
+            }
+        }
+
+        // ===== 加入房间 =====
+        async function joinByCode() {
+            const code = prompt('请输入房间号：');
+            if (!code || !code.trim()) return;
+            await joinRoom(PEER_PREFIX + code.trim().toUpperCase() + '-host');
+        }
+
+        async function joinByClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                const hash = text.trim().split('#').pop();
+                if (hash && hash.startsWith(PEER_PREFIX)) {
+                    await joinRoom(hash);
+                } else {
+                    showToast('剪贴板中没有有效的链接', 'error');
+                }
+            } catch {
+                showToast('无法读取剪贴板', 'error');
+            }
+        }
+
+        async function joinFromHash() {
+            const hash = window.location.hash.slice(1);
+            if (hash && hash.startsWith(PEER_PREFIX)) {
+                await joinRoom(hash);
+            }
+        }
+
+        async function joinRoom(hostPeerId) {
+            if (_isJoining) return;
+            _isJoining = true;
+            isHost = false;
+            myDisplayName = generateName();
+            localStream = new MediaStream();
+
+            setStatus('正在连接...', 'waiting');
+            showView('meeting');
+            $('connectingOverlay').classList.add('visible');
+
+            try {
+                peer = new Peer(undefined, { debug: 0 });
+
+                peer.on('open', () => {
+                    myPeerId = peer.id;
+                    participants.set(myPeerId, { name: myDisplayName, isHost: false, isMicOn: false, isCamOn: false });
+
+                    // 先建立 data channel
+                    const conn = peer.connect(hostPeerId, { reliable: true });
+                    conn.on('open', () => {
+                        peers.set(hostPeerId, { conn, call: null, remoteStream: null });
+                        // 自我介绍
+                        conn.send({
+                            type: 'introduce',
+                            data: { name: myDisplayName, isMicOn: false, isCamOn: false }
+                        });
+                        participants.set(hostPeerId, { name: '主持人', isHost: true, isMicOn: false, isCamOn: false });
+                        renderParticipantList();
+                        updateParticipantCount();
+
+                        // 然后发起 media call
+                        setStatus('正在呼叫...', 'waiting');
+                        const call = peer.call(hostPeerId, localStream);
+                        if (call) {
+                            peers.get(hostPeerId).call = call;
+                            handleCallStream(call, hostPeerId);
+                        }
+                    });
+
+                    conn.on('data', (data) => handleDataMessage(hostPeerId, data));
+                    conn.on('close', () => {
+                        removePeer(hostPeerId);
+                    });
+                });
+
+                peer.on('connection', (conn) => {
+                    // 其他参会者连接我（mesh）
+                    if (conn.peer !== hostPeerId) {
+                        handleNewConnection(conn);
+                    }
+                });
+
+                peer.on('call', (call) => {
+                    handleIncomingCall(call);
+                });
+
+                peer.on('error', (err) => {
+                    console.error('PeerJS error:', err);
+                    $('connectingOverlay').classList.remove('visible');
+                    if (err.type === 'peer-unavailable') {
+                        showToast('房间不存在或已过期', 'error');
+                    } else {
+                        showToast('连接失败: ' + err.type, 'error');
+                    }
+                    setStatus('连接失败', '');
+                    showView('landing');
+                });
+            } catch (e) {
+                showToast('连接失败', 'error');
+                $('connectingOverlay').classList.remove('visible');
+                showView('landing');
+            } finally {
+                _isJoining = false;
+            }
+        }
+
+        // ===== 处理新 Data Connection =====
+        function handleNewConnection(conn) {
+            conn.on('open', () => {
+                const peerId = conn.peer;
+                if (peers.has(peerId)) {
+                    // 已有连接，更新 conn
+                    peers.get(peerId).conn = conn;
+                } else {
+                    peers.set(peerId, { conn, call: null, remoteStream: null });
+                }
+
+                conn.on('data', (data) => handleDataMessage(peerId, data));
+                conn.on('close', () => removePeer(peerId));
+
+                // 如果我是主持人，发送完整参会者列表
+                if (isHost) {
+                    const list = {};
+                    participants.forEach((v, k) => { list[k] = v; });
+                    conn.send({ type: 'participant-list', list });
+                }
+
+                // 向新成员介绍所有已有成员
+                participants.forEach((info, pid) => {
+                    if (pid !== peerId && pid !== myPeerId) {
+                        conn.send({ type: 'introduce', data: { name: info.name, isMicOn: info.isMicOn, isCamOn: info.isCamOn } });
+                    }
+                });
+            });
+        }
+
+        // ===== 处理来电 =====
+        function handleIncomingCall(call) {
+            const peerId = call.peer;
+
+            // 检查人数限制
+            if (participants.size >= MAX_PARTICIPANTS) {
+                showToast('会议已满（最多 ' + MAX_PARTICIPANTS + ' 人）', 'error');
+                call.close();
+                return;
+            }
+
+            call.answer(localStream);
+
+            if (peers.has(peerId)) {
+                peers.get(peerId).call = call;
+            } else {
+                peers.set(peerId, { conn: null, call, remoteStream: null });
+            }
+
+            handleCallStream(call, peerId);
+
+            // 如果没有 data connection，也建立一个
+            if (!peers.get(peerId)?.conn) {
+                const conn = peer.connect(peerId, { reliable: true });
+                conn.on('open', () => {
+                    if (peers.has(peerId)) {
+                        peers.get(peerId).conn = conn;
+                    }
+                    conn.send({ type: 'introduce', data: { name: myDisplayName, isMicOn, isCamOn } });
+                    conn.on('data', (data) => handleDataMessage(peerId, data));
+                    conn.on('close', () => removePeer(peerId));
+                });
+            }
+        }
+
+        // ===== 处理通话流 =====
+        function handleCallStream(call, peerId) {
+            call.on('stream', (remoteStream) => {
+                if (peers.has(peerId)) {
+                    peers.get(peerId).remoteStream = remoteStream;
+                }
+
+                const videoEl = $('video-' + peerId);
+                if (videoEl) {
+                    videoEl.srcObject = remoteStream;
+                }
+                const placeholder = $('placeholder-' + peerId);
+                if (placeholder) placeholder.style.display = 'none';
+
+                // 第一次收到流，进入会议
+                if ($('connectingOverlay').classList.contains('visible')) {
+                    $('connectingOverlay').classList.remove('visible');
+                    showView('meeting');
+                    setStatus('通话中', 'connected');
+                    startTimer();
+                    showToast('连接成功', 'success');
+                }
+
+                renderVideoGrid();
+                renderParticipantList();
+                updateParticipantCount();
+            });
+
+            call.on('close', () => removePeer(peerId));
+            call.on('error', (err) => {
+                console.error('Call error:', err);
+                removePeer(peerId);
+            });
+
+            // 超时
+            setTimeout(() => {
+                if ($('connectingOverlay').classList.contains('visible')) {
+                    $('connectingOverlay').classList.remove('visible');
+                    showToast('连接超时', 'error');
+                    hangUp();
+                }
+            }, 30000);
+        }
+
+        // ===== 移除 Peer =====
+        function removePeer(peerId) {
+            const info = participants.get(peerId);
+            if (info) showToast(`${info.name} 离开了会议`);
+            const data = peers.get(peerId);
+            if (data) {
+                if (data.call) data.call.close();
+                if (data.conn) data.conn.close();
+            }
+            peers.delete(peerId);
+            participants.delete(peerId);
+            renderVideoGrid();
+            renderParticipantList();
+            updateParticipantCount();
+
+            // 如果所有人都走了
+            if (participants.size <= 1 && callStartTime) {
+                stopTimer();
+            }
+        }
+
+        // ===== 挂断 =====
+        function hangUp() {
+            stopTimer();
+            $('connectingOverlay').classList.remove('visible');
+            $('sidebar').classList.remove('visible');
+
+            peers.forEach(({ call, conn }) => {
+                if (call) call.close();
+                if (conn) conn.close();
+            });
+            peers.clear();
+            participants.clear();
+
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = new MediaStream();
+            }
+            if (peer) { peer.destroy(); peer = null; }
+
+            isMicOn = false;
+            isCamOn = false;
+            isHost = false;
+            roomId = null;
+            myPeerId = null;
+            _isTogglingMic = false;
+            _isTogglingCam = false;
+            _isCreating = false;
+            _isJoining = false;
+
+            $('micBtn').classList.remove('active');
+            $('micBtn').innerHTML = '🔇<span class="tooltip">麦克风已关闭</span>';
+            $('camBtn').classList.remove('active');
+            $('camBtn').innerHTML = '🚫<span class="tooltip">摄像头已关闭</span>';
+
+            showView('landing');
+            setStatus('未连接', '');
+            history.replaceState(null, '', window.location.pathname);
+        }
+
+        // ===== 侧边栏 =====
+        function toggleSidebar() {
+            $('sidebar').classList.toggle('visible');
+        }
+
+        // ===== 复制链接 =====
+        async function copyLink() {
+            try {
+                await navigator.clipboard.writeText($('shareLink').value);
+                const btn = $('copyBtn');
+                btn.textContent = '已复制 ✓';
+                btn.classList.add('copied');
+                showToast('链接已复制', 'success');
+                setTimeout(() => { btn.textContent = '复制链接'; btn.classList.remove('copied'); }, 2000);
+            } catch {
+                $('shareLink').select();
+                document.execCommand('copy');
+                showToast('链接已复制', 'success');
+            }
+        }
+
+        // ===== 初始化 =====
+        window.addEventListener('load', () => {
+            const hash = window.location.hash.slice(1);
+            if (hash && hash.startsWith(PEER_PREFIX)) {
+                joinFromHash();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => hangUp());
+    </script>
+</body>
+</html>
