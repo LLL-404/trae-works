@@ -102,12 +102,14 @@ export class GameState implements GameStateModel {
   // ===== 操作方法 =====
 
   addGold(amount: number): void {
-    this.gold += amount;
+    if (!Number.isFinite(amount) || amount === 0) return;
+    this.gold = Math.max(0, this.gold + amount);
     this.notify();
   }
 
-  /** 消费金币，不足返回 false 且不变更状态 */
+  /** 消费金币，不足或非法金额返回 false 且不变更状态 */
   spendGold(amount: number): boolean {
+    if (!Number.isFinite(amount) || amount < 0) return false;
     if (this.gold < amount) return false;
     this.gold -= amount;
     this.notify();
@@ -115,11 +117,25 @@ export class GameState implements GameStateModel {
   }
 
   damagePlayer(amount: number): void {
+    if (!Number.isFinite(amount) || amount <= 0) return;
     this.playerHp = Math.max(0, this.playerHp - amount);
     this.notify();
   }
 
+  /** 棋盘坐标合法性校验（内部使用） */
+  private isInsideBoard(col: number, row: number): boolean {
+    return (
+      Number.isInteger(col) &&
+      Number.isInteger(row) &&
+      col >= 0 &&
+      col < BOARD_COLS &&
+      row >= 0 &&
+      row < BOARD_ROWS
+    );
+  }
+
   placeUnitOnBoard(unit: Unit, col: number, row: number): void {
+    if (!this.isInsideBoard(col, row)) return;
     this.board[col][row] = unit;
     unit.col = col;
     unit.row = row;
@@ -127,6 +143,7 @@ export class GameState implements GameStateModel {
   }
 
   removeUnitFromBoard(col: number, row: number): void {
+    if (!this.isInsideBoard(col, row)) return;
     const u = this.board[col][row];
     this.board[col][row] = null;
     if (u) {
@@ -142,13 +159,14 @@ export class GameState implements GameStateModel {
     toCol: number,
     toRow: number,
   ): void {
+    if (!this.isInsideBoard(fromCol, fromRow)) return;
+    if (!this.isInsideBoard(toCol, toRow)) return;
     const u = this.board[fromCol][fromRow];
+    if (!u) return; // 源格子无单位，无操作
     this.board[fromCol][fromRow] = null;
     this.board[toCol][toRow] = u;
-    if (u) {
-      u.col = toCol;
-      u.row = toRow;
-    }
+    u.col = toCol;
+    u.row = toRow;
     this.notify();
   }
 

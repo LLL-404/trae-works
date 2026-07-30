@@ -63,8 +63,9 @@ export class ShopSystem {
     };
 
     if (!this.state.addToBench(unit)) {
-      // 备战区已满：退还金币
+      // 备战区已满：退还金币并恢复槽位为可购买
       this.state.addGold(UNIT_COST);
+      this.state.shop[index].sold = false;
       return null;
     }
 

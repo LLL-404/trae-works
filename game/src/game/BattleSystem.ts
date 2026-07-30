@@ -77,6 +77,9 @@ export class BattleSystem {
       return { finished: true };
     }
 
+    // 防御性下限：非法 delta 视为 0，避免 NaN/负数污染战斗状态
+    const dt = Number.isFinite(deltaSeconds) && deltaSeconds > 0 ? deltaSeconds : 0;
+
     // 每个存活单位行动
     for (const unit of this.activeUnits) {
       if (unit.currentHp <= 0) continue;
@@ -89,7 +92,7 @@ export class BattleSystem {
 
       if (dist > unit.stats.range) {
         // 向目标移动（沿归一化方向），但不越过 range 边界，避免反复横跳
-        const moveAmount = unit.stats.moveSpeed * deltaSeconds;
+        const moveAmount = unit.stats.moveSpeed * dt;
         const moveDistance = Math.min(moveAmount, dist - unit.stats.range);
         if (moveDistance > 0) {
           unit.col += (dx / dist) * moveDistance;
@@ -98,11 +101,13 @@ export class BattleSystem {
         this.unitRenderer.moveUnit(unit.id, unit.col, unit.row);
       } else {
         // 在攻击范围内：按 attackSpeed 累积攻击间隔
+        // 防御性下限：attackSpeed <= 0 时视为 1，避免 1/0 = Infinity 永不攻击
+        const speed = unit.stats.attackSpeed > 0 ? unit.stats.attackSpeed : 1;
         let cooldown = this.attackCooldowns.get(unit.id) ?? 0;
-        cooldown -= deltaSeconds;
+        cooldown -= dt;
         if (cooldown <= 0) {
           target.currentHp -= unit.stats.attack;
-          cooldown = 1 / unit.stats.attackSpeed;
+          cooldown = 1 / speed;
         }
         this.attackCooldowns.set(unit.id, cooldown);
       }

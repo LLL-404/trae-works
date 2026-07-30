@@ -40,7 +40,8 @@ export class CombatResolver {
       hpLost = 0;
       rewardGold = 5;
     } else if (result === 'enemy') {
-      hpLost = survivingEnemyCount * 2;
+      // 防御性下限：避免负数存活数导致负伤害（变成加血）
+      hpLost = Math.max(0, survivingEnemyCount) * 2;
       rewardGold = 0;
     } else {
       hpLost = 2;

@@ -24,18 +24,20 @@ export class RogueProgression {
   constructor(private readonly state: GameState) {}
 
   /**
-   * 敌方单位数量：3 + floor(round / 2)，上限 12。
+   * 敌方单位数量：3 + floor(round / 2)，上限 12，下限 0。
    */
   getEnemyCount(round: number): number {
-    return Math.min(MAX_ENEMY_COUNT, 3 + Math.floor(round / 2));
+    const r = Number.isFinite(round) && round > 0 ? Math.floor(round) : 1;
+    return Math.max(0, Math.min(MAX_ENEMY_COUNT, 3 + Math.floor(r / 2)));
   }
 
   /**
    * 敌方属性倍率：每回合 +10%，即 1 + (round - 1) * 0.1。
-   * round=1 时倍率为 1.0。
+   * round=1 时倍率为 1.0。非法 round 按下限 0.1 处理。
    */
   getEnemyStatMultiplier(round: number): number {
-    return 1 + (round - 1) * 0.1;
+    const r = Number.isFinite(round) && round > 0 ? round : 1;
+    return Math.max(0.1, 1 + (r - 1) * 0.1);
   }
 
   /**

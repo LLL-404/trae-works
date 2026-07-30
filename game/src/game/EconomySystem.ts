@@ -34,8 +34,11 @@ export class EconomySystem {
     currentGold: number,
     augments: AugmentId[],
   ): IncomeBreakdown {
-    const base = 5 + round;
-    const interest = Math.min(5, Math.floor(currentGold / 10));
+    // 防御性下限：round/gold 非法时按 1/0 处理，避免负收入
+    const safeRound = Number.isFinite(round) && round > 0 ? Math.floor(round) : 1;
+    const safeGold = Number.isFinite(currentGold) && currentGold > 0 ? currentGold : 0;
+    const base = 5 + safeRound;
+    const interest = Math.min(5, Math.floor(safeGold / 10));
     const augmentBonus = augments.includes(AugmentId.GoldIncome) ? 2 : 0;
     const total = base + interest + augmentBonus;
     return { base, interest, augmentBonus, total };
