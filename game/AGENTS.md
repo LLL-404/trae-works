@@ -43,6 +43,18 @@ src/
 
 commit message 使用英文或中文均可，但须描述变更目的。
 
+## 自动推送机制
+
+项目已配置 git post-commit hook（位于 `scripts/hooks/post-commit`），通过 `core.hooksPath` 启用。
+
+- 每次 `git commit` 后，hook 自动检测本地是否领先远程分支
+- 本地领先时自动执行 `git push`（首次推送会自动设置上游跟踪）
+- 禁止直接 push 到 `main` 分支（hook 会跳过 main）
+- 本地落后远程时不自动推送（需手动处理冲突后重试）
+- GitHub Actions 的 `auto-pr.yml` 会在 push 后自动创建到 main 的 PR
+
+因此，完成变更后只需 `git add` + `git commit`，推送和 PR 创建由自动化处理。
+
 ## 代码规范
 
 - TypeScript strict 模式已启用，禁止使用 `any`

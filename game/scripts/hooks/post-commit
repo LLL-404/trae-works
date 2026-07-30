@@ -1,0 +1,51 @@
+#!/bin/bash
+# post-commit hook: 本地领先远程时自动推送
+# 通过 core.hooksPath 指向此文件启用
+
+set -e
+
+# 获取当前分支名
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# 禁止直接 push 到 main 分支
+if [ "$BRANCH" = "main" ]; then
+  echo "[post-commit] 当前在 main 分支，跳过自动推送（禁止直接 push 到 main）"
+  exit 0
+fi
+
+# 检查是否有上游跟踪分支
+UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+
+if [ -z "$UPSTREAM" ]; then
+  # 无上游跟踪：首次推送并设置跟踪
+  echo "[post-commit] 分支 $BRANCH 无上游跟踪，执行 git push -u origin $BRANCH"
+  if git push -u origin "$BRANCH" 2>&1; then
+    echo "[post-commit] 推送成功并已设置上游跟踪"
+  else
+    echo "[post-commit] 推送失败，请手动检查（commit 已完成）"
+  fi
+  exit 0
+fi
+
+# 有上游跟踪：fetch 远程最新状态
+git fetch origin "$BRANCH" 2>/dev/null || true
+
+# 比较本地与远程
+AHEAD=$(git rev-list --count "$UPSTREAM"..HEAD 2>/dev/null || echo "0")
+BEHIND=$(git rev-list --count HEAD.."$UPSTREAM" 2>/dev/null || echo "0")
+
+if [ "$AHEAD" -gt 0 ] && [ "$BEHIND" -eq 0 ]; then
+  # 本地领先远程：自动推送
+  echo "[post-commit] 本地领先远程 $AHEAD 个提交，执行 git push"
+  if git push 2>&1; then
+    echo "[post-commit] 推送成功"
+  else
+    echo "[post-commit] 推送失败，请手动检查（commit 已完成）"
+  fi
+elif [ "$AHEAD" -gt 0 ] && [ "$BEHIND" -gt 0 ]; then
+  # 本地与远程分叉：不自动推送，需手动处理
+  echo "[post-commit] 警告：本地与远程分叉（领先 $AHEAD，落后 $BEHIND），请手动处理冲突后重试"
+elif [ "$AHEAD" -eq 0 ]; then
+  # 已同步
+  echo "[post-commit] 本地与远程已同步，无需推送"
+fi
