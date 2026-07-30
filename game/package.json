@@ -1,13 +1,14 @@
 {
   "name": "autobattler-mvp",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "package:taptap": "npm run build && node scripts/package-taptap.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"

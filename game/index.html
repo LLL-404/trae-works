@@ -2,7 +2,16 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- TapTap 小游戏：横屏告知 -->
+    <meta name="screen-orientation" content="landscape" />
+    <meta name="x5-orientation" content="landscape" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
     <title>3D 自走棋肉鸽 MVP</title>
     <style>
       html,
@@ -11,13 +20,41 @@
         padding: 0;
         overflow: hidden;
         background: #000;
+        /* 禁止文本选择，避免触控长按选中 */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        /* 横屏锁定提示容器 */
+        width: 100%;
+        height: 100%;
       }
       canvas {
         display: block;
+        touch-action: none; /* 禁止浏览器默认手势，交由 PointerEvent 处理 */
+      }
+      /* 竖屏时提示旋转手机 */
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #000;
+        color: #fff;
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 18px;
+        padding: 20px;
+      }
+      @media screen and (orientation: portrait) {
+        #rotate-hint {
+          display: flex;
+        }
       }
     </style>
   </head>
   <body>
+    <div id="rotate-hint">请横屏游玩以获得最佳体验</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

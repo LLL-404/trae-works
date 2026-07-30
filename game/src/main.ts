@@ -294,16 +294,55 @@ function proceedToNextRound(): void {
   spawnEnemies(state.round);
 }
 
-// ===== 鼠标点击处理（raycaster 检测棋盘格子） =====
+// ===== 指针交互（同时支持鼠标与触控）=====
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
-// 阻止右键默认菜单
-renderer.domElement.addEventListener('contextmenu', (e) =>
+// 长按检测：触控设备无右键，长按 500ms 触发撤回
+let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+let longPressTile: { col: number; row: number } | null = null;
+const LONG_PRESS_MS = 500;
+
+// 阻止右键默认菜单（桌面端）
+renderer.domElement.addEventListener('contextmenu', (e: MouseEvent) =>
   e.preventDefault(),
 );
 
-renderer.domElement.addEventListener('mousedown', (event) => {
+// 触摸时禁止页面滚动/缩放
+renderer.domElement.addEventListener(
+  'touchmove',
+  (e: TouchEvent) => e.preventDefault(),
+  {
+    passive: false,
+  },
+);
+
+const handleTileHit = (
+  col: number,
+  row: number,
+  isSecondary: boolean,
+): void => {
+  if (isSecondary) {
+    // 右键/长按：撤回到备战区
+    ui.onRecall(col, row);
+    return;
+  }
+  // 左键/单击：已选中则放置，否则选中格子上的玩家单位
+  if (placementController.hasSelected()) {
+    const tileUnit = state.board[col]?.[row];
+    if (tileUnit && tileUnit.id === placementController.selectedUnitId) {
+      placementController.deselect();
+      ui.clearBenchSelection();
+    } else {
+      ui.onPlaceAt(col, row);
+    }
+  } else {
+    ui.onSelectBoard(col, row);
+  }
+};
+
+// 统一使用 pointerdown 支持鼠标 + 触控
+renderer.domElement.addEventListener('pointerdown', (event: PointerEvent) => {
   if (state.phase !== 'prep') return;
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -323,26 +362,48 @@ renderer.domElement.addEventListener('mousedown', (event) => {
     ) {
       const col = ud.col;
       const row = ud.row;
-      if (event.button === 2) {
-        // 右键：撤回到备战区
-        ui.onRecall(col, row);
-      } else if (event.button === 0) {
-        // 左键：已选中则放置，否则选中格子上的玩家单位
-        if (placementController.hasSelected()) {
-          const tileUnit = state.board[col]?.[row];
-          if (tileUnit && tileUnit.id === placementController.selectedUnitId) {
-            // 点击当前选中单位 → 取消选中
-            placementController.deselect();
-            ui.clearBenchSelection();
-          } else {
-            ui.onPlaceAt(col, row);
+      const isSecondary = event.button === 2;
+      handleTileHit(col, row, isSecondary);
+      // 触摸设备：启动长按计时器，到时触发撤回
+      if (
+        event.pointerType === 'touch' &&
+        !isSecondary &&
+        !longPressTimer
+      ) {
+        longPressTile = { col, row };
+        longPressTimer = setTimeout(() => {
+          if (longPressTile) {
+            handleTileHit(longPressTile.col, longPressTile.row, true);
+            longPressTile = null;
+            longPressTimer = null;
           }
-        } else {
-          ui.onSelectBoard(col, row);
-        }
+        }, LONG_PRESS_MS);
       }
       return;
     }
+  }
+});
+
+// 触摸移动或抬起时取消长按
+renderer.domElement.addEventListener('pointermove', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    longPressTile = null;
+  }
+});
+renderer.domElement.addEventListener('pointerup', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    longPressTile = null;
+  }
+});
+renderer.domElement.addEventListener('pointercancel', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    longPressTile = null;
   }
 });
 

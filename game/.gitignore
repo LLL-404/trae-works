@@ -31,3 +31,10 @@ dist-ssr
 # Cache
 .cache
 .vite
+
+# TapTap 小游戏打包产物
+autobattler-mvp.zip
+.taptap-staging
+
+# Maker 临时目录
+maker-game
