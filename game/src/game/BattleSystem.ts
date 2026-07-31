@@ -168,6 +168,16 @@ export class BattleSystem {
     return this.activeUnits.map((u) => this.cloneUnit(u));
   }
 
+  /** 返回战斗已用时间比例（0-1），未运行时返回 0 */
+  getElapsedRatio(): number {
+    if (!this.isRunning) return 0;
+    const elapsed = performance.now() - this.battleStartTime;
+    const ratio = elapsed / BATTLE_TIMEOUT_MS;
+    if (ratio < 0) return 0;
+    if (ratio > 1) return 1;
+    return ratio;
+  }
+
   /** 强制结束战斗 */
   stop(): void {
     this.isRunning = false;

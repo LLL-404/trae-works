@@ -84,8 +84,24 @@ ui.onRefresh = () => {
 };
 
 ui.onStartBattle = () => {
+  // 防御性检查：玩家未放置任何单位时提示，避免直接失败扣 HP
+  if (countPlayerUnits() === 0) {
+    ui.toast('请先从备战区放置单位到棋盘');
+    return;
+  }
   startBattle();
 };
+
+/** 统计玩家棋盘上的单位数量 */
+function countPlayerUnits(): number {
+  let n = 0;
+  for (const column of state.board) {
+    for (const u of column) {
+      if (u) n++;
+    }
+  }
+  return n;
+}
 
 ui.onSelectBench = (index: number) => {
   const current = state.bench[index];
@@ -140,6 +156,10 @@ ui.onChooseAugment = (id) => {
 };
 
 ui.onRestart = () => {
+  // 防御性清理：重置选中状态与战斗系统，避免重启后状态残留
+  placementController.deselect();
+  ui.clearBenchSelection();
+  battleSystem.stop();
   clearAllUnits3D();
   rogueProgression.startNewRun();
   shopSystem.populateShop();
@@ -435,9 +455,44 @@ function animate(now: number): void {
     const tickResult = battleSystem.tick(delta);
     if (tickResult.finished) {
       settleBattle(tickResult.result ?? 'draw');
+    } else {
+      // 更新战斗进度条（剩余时间比例：1=刚开始，0=时间到）
+      ui.updateBattleProgress(1 - battleSystem.getElapsedRatio());
     }
   }
 
   renderer.render(scene, camera);
 }
 requestAnimationFrame(animate);
+
+// ===== DEV 模式测试钩子 =====
+// 仅在开发环境（vite dev server）下暴露，生产构建会被 tree-shake 移除。
+// E2E 测试通过此钩子直接放置单位到棋盘，绕过 3D canvas 坐标拾取的不确定性。
+if (import.meta.env.DEV) {
+  const testApi = {
+    /** 将备战区第一个单位放置到指定格子 */
+    placeFirstBenchUnit: (col: number, row: number): boolean => {
+      const benchIdx = state.bench.findIndex((u) => u !== null);
+      if (benchIdx < 0) return false;
+      if (placementController.selectBenchUnit(benchIdx)) {
+        return placementController.placeSelected(col, row);
+      }
+      return false;
+    },
+    /** 获取玩家棋盘上的单位数 */
+    countPlayerUnits: (): number => {
+      let n = 0;
+      for (const column of state.board) {
+        for (const u of column) {
+          if (u) n++;
+        }
+      }
+      return n;
+    },
+  };
+  Object.defineProperty(window, '__gameTest', {
+    value: testApi,
+    writable: false,
+    configurable: false,
+  });
+}

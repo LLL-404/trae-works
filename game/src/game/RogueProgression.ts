@@ -66,8 +66,11 @@ export class RogueProgression {
       [positions[i], positions[j]] = [positions[j], positions[i]];
     }
 
+    // 防御性下限：count 超过可用格子数时截断，避免 positions[i] 越界
+    const safeCount = Math.min(count, positions.length);
+
     const units: Unit[] = [];
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < safeCount; i++) {
       const type = UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
       const def = UNIT_DEFINITIONS[type];
       const stats: UnitStats = {

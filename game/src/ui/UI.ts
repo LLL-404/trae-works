@@ -9,6 +9,7 @@ import type {
 } from '../types';
 import { BENCH_SIZE, SHOP_SIZE } from '../types';
 import { UNIT_DEFINITIONS } from '../data/units';
+import { AUGMENT_DEFINITIONS } from '../data/augments';
 import { REFRESH_COST, UNIT_COST } from '../game/EconomySystem';
 
 /** 阶段中文标签 */
@@ -52,6 +53,9 @@ export class UI {
   private readonly augmentCards: HTMLDivElement;
   private readonly gameoverPanel: HTMLDivElement;
   private readonly toastEl: HTMLDivElement;
+  private readonly battleProgressEl: HTMLDivElement;
+  private readonly battleProgressBar: HTMLDivElement;
+  private readonly augmentListEl: HTMLDivElement;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   private lastBench: (Unit | null)[] = [];
@@ -70,6 +74,20 @@ export class UI {
     this.hudPhase = document.createElement('span');
     hud.append(this.hudGold, this.hudHp, this.hudRound, this.hudPhase);
     root.appendChild(hud);
+
+    // ----- 战斗进度条（仅 battle 阶段显示） -----
+    this.battleProgressEl = document.createElement('div');
+    this.battleProgressEl.id = 'battle-progress';
+    this.battleProgressEl.className = 'hidden';
+    this.battleProgressBar = document.createElement('div');
+    this.battleProgressBar.id = 'battle-progress-bar';
+    this.battleProgressEl.appendChild(this.battleProgressBar);
+    root.appendChild(this.battleProgressEl);
+
+    // ----- 已选强化列表 -----
+    this.augmentListEl = document.createElement('div');
+    this.augmentListEl.id = 'augment-list';
+    root.appendChild(this.augmentListEl);
 
     // ----- 底部栏 -----
     const bottom = document.createElement('div');
@@ -150,6 +168,7 @@ export class UI {
     this.updateShop(snap.shop);
     this.updateBench(snap.bench);
     this.setPhase(snap.phase);
+    this.updateAugmentList(snap.augments);
     // 强化面板：仅在 augment 阶段且有选项时显示
     if (snap.phase === 'augment' && snap.pendingAugmentChoices.length > 0) {
       this.showAugmentChoices(snap.pendingAugmentChoices);
@@ -170,6 +189,14 @@ export class UI {
     this.hudHp.textContent = `HP: ${state.playerHp}`;
     this.hudRound.textContent = `回合: ${state.round}`;
     this.hudPhase.textContent = `阶段: ${PHASE_LABELS[state.phase]}`;
+    // HP 低警告：playerHp <= 20 时 HP 文字变红并闪烁
+    this.hudHp.classList.toggle('hp-low', state.playerHp <= 20);
+  }
+
+  /** 更新战斗进度条（ratio: 0-1，1=满=刚开始，0=空=时间到） */
+  updateBattleProgress(ratio: number): void {
+    const clamped = ratio < 0 ? 0 : ratio > 1 ? 1 : ratio;
+    this.battleProgressBar.style.width = `${clamped * 100}%`;
   }
 
   updateShop(shop: ShopSlot[]): void {
@@ -223,6 +250,7 @@ export class UI {
   setPhase(phase: GamePhase): void {
     this.hudPhase.textContent = `阶段: ${PHASE_LABELS[phase]}`;
     const isPrep = phase === 'prep';
+    const isBattle = phase === 'battle';
     // 战斗按钮仅在 prep 阶段显示
     this.battleBtn.style.display = isPrep ? '' : 'none';
     this.battleBtn.disabled = !isPrep;
@@ -230,6 +258,8 @@ export class UI {
     this.refreshBtn.disabled = !isPrep;
     this.shopEl.classList.toggle('disabled', !isPrep);
     this.benchEl.classList.toggle('disabled', !isPrep);
+    // 战斗进度条仅在 battle 阶段显示
+    this.battleProgressEl.classList.toggle('hidden', !isBattle);
   }
 
   showAugmentChoices(choices: HexAugment[]): void {
@@ -266,6 +296,19 @@ export class UI {
   }
 
   // ===== 内部方法 =====
+  /** 更新已选强化列表（stat 类蓝色标签，economy 类金色标签） */
+  private updateAugmentList(augments: AugmentId[]): void {
+    this.augmentListEl.innerHTML = '';
+    for (const id of augments) {
+      const def = AUGMENT_DEFINITIONS[id];
+      if (!def) continue;
+      const tag = document.createElement('span');
+      tag.className = `augment-tag ${def.kind}`;
+      tag.textContent = def.name;
+      this.augmentListEl.appendChild(tag);
+    }
+  }
+
   private renderBench(): void {
     this.benchEl.innerHTML = '';
     for (let i = 0; i < BENCH_SIZE; i++) {

@@ -235,6 +235,67 @@
   margin-top: 6px;
 }
 
+/* ===== 战斗进度条 ===== */
+#battle-progress {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 360px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+#battle-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #e53935, #ffb74d);
+  width: 100%;
+}
+
+/* ===== HP 低警告 ===== */
+@keyframes hp-warning {
+  0%,
+  100% {
+    color: #ff4444;
+  }
+  50% {
+    color: #ff8888;
+  }
+}
+.hp-low {
+  animation: hp-warning 0.8s infinite;
+  color: #ff4444;
+}
+
+/* ===== 已选强化列表 ===== */
+#augment-list {
+  position: absolute;
+  top: 56px;
+  left: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 320px;
+}
+.augment-tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  font-weight: 600;
+}
+.augment-tag.stat {
+  color: #64b5f6;
+  border: 1px solid rgba(100, 181, 246, 0.6);
+}
+.augment-tag.economy {
+  color: #ffd54a;
+  border: 1px solid rgba(255, 213, 74, 0.6);
+}
+
 /* ===== Toast ===== */
 #toast {
   position: absolute;

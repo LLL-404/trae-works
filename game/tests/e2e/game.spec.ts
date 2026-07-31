@@ -112,32 +112,57 @@ test.describe('3D 自走棋核心游戏流程 E2E', () => {
     await expect(page.locator('.bench-slot.selected')).toHaveCount(1);
   });
 
-  // 6. 开始战斗与结算
-  test('不放置单位开始战斗后立即失败、扣 HP 并进入下一回合', async ({ page }) => {
-    // 不放置任何单位，直接开始战斗
+  // 6. 无单位开始战斗的守卫
+  test('无单位时点击开始战斗显示提示且不进入战斗', async ({ page }) => {
+    // 不放置任何单位，直接点击开始战斗
     await page.locator('#battle-btn').click();
 
-    // 战斗阶段（战斗中）在玩家无单位时仅持续一帧（首帧即判定玩家全灭），
-    // 难以稳定捕获；用 poll 等待结算完成（回合推进到 2）。
-    await expectHud(page, '回合: 2');
-
-    // 结算后：玩家无单位立即失败，敌方 3 单位存活 * 2 = 6 伤害，100 - 6 = 94
-    const hud = (await page.locator('#hud').textContent()) ?? '';
-    expect(hud).toContain('HP: 94');
-    expect(hud).toContain('阶段: 准备阶段');
-    expect(hud).toContain('回合: 2');
+    // 应显示 toast 提示，且状态不变（仍在回合 1 准备阶段）
+    await expect(page.locator('#toast')).toContainText('请先从备战区放置单位');
+    await expectHud(page, '回合: 1');
+    await expectHud(page, '阶段: 准备阶段');
+    await expectHud(page, 'HP: 100');
   });
 
-  // 7. 强化选择流程
+  // 7. 强化选择流程（需先放置单位再战斗）
   test('偶数回合战斗结束后弹出强化选择，选择后进入下一回合', async ({ page }) => {
-    // 回合 1 战斗（不放置单位，直接失败）→ 进入回合 2
-    await page.locator('#battle-btn').click();
-    await expectHud(page, '回合: 2');
-    // 确认回到准备阶段（战斗按钮可用），再开始回合 2 战斗
-    await expectHud(page, '阶段: 准备阶段');
-    await page.locator('#battle-btn').click();
+    // 回合 1：购买 2 个单位并通过测试钩子放置到棋盘（绕过 canvas 坐标拾取）
+    await page.locator('.shop-slot:not(.empty)').nth(0).click();
+    await page.locator('.shop-slot:not(.empty)').nth(0).click();
+    await expectHud(page, '金币: 1');
+    // 通过 DEV 测试钩子放置备战区单位到玩家区 (col, row)
+    await page.evaluate(() => {
+      const api = (window as unknown as { __gameTest?: { placeFirstBenchUnit: (c: number, r: number) => boolean } }).__gameTest;
+      api?.placeFirstBenchUnit(0, 0);
+      api?.placeFirstBenchUnit(1, 0);
+    });
+    // 确认有 2 个单位在棋盘上
+    const count = await page.evaluate(() =>
+      (window as unknown as { __gameTest?: { countPlayerUnits: () => number } }).__gameTest?.countPlayerUnits() ?? 0,
+    );
+    expect(count).toBe(2);
 
-    // 回合 2 战斗（偶数回合）→ 战斗后弹出强化选择面板（无 hidden class）
+    // 开始回合 1 战斗
+    await page.locator('#battle-btn').click();
+    // 等待回合 1 战斗结束并进入回合 2
+    await expectHud(page, '回合: 2');
+    await expectHud(page, '阶段: 准备阶段');
+
+    // 回合 2：若回合 1 单位阵亡，重新购买并放置
+    const round2Count = await page.evaluate(() =>
+      (window as unknown as { __gameTest?: { countPlayerUnits: () => number } }).__gameTest?.countPlayerUnits() ?? 0,
+    );
+    if (round2Count === 0) {
+      // 回合 2 收入后金币足够，购买并放置
+      await page.locator('.shop-slot:not(.empty)').nth(0).click();
+      await page.evaluate(() => {
+        const api = (window as unknown as { __gameTest?: { placeFirstBenchUnit: (c: number, r: number) => boolean } }).__gameTest;
+        api?.placeFirstBenchUnit(0, 0);
+      });
+    }
+
+    // 开始回合 2 战斗（偶数回合）→ 战斗后弹出强化选择面板
+    await page.locator('#battle-btn').click();
     await expect(page.locator('#augment-panel')).toBeVisible();
     // 3 张强化卡
     await expect(page.locator('#augment-cards .augment-card')).toHaveCount(3);
@@ -145,9 +170,8 @@ test.describe('3D 自走棋核心游戏流程 E2E', () => {
     // 点击第一张强化卡
     await page.locator('#augment-cards .augment-card').first().click();
 
-    // 强化面板隐藏
+    // 强化面板隐藏，阶段回到准备阶段，回合变为 3
     await expect(page.locator('#augment-panel')).toBeHidden();
-    // 阶段回到准备阶段，回合变为 3
     await expectHud(page, '回合: 3');
     await expectHud(page, '阶段: 准备阶段');
   });
