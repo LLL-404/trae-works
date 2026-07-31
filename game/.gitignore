@@ -38,3 +38,9 @@ autobattler-mvp.zip
 
 # Maker 临时目录
 maker-game
+
+# 测试产物
+coverage
+playwright-report
+test-results
+
