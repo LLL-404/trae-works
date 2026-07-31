@@ -131,7 +131,11 @@ ui.onRecall = (col: number, row: number) => {
 };
 
 ui.onChooseAugment = (id) => {
-  augmentSystem.choose(id);
+  // 防御性检查：choose 失败（id 不在待选中）时不推进回合，避免跳过强化
+  if (!augmentSystem.choose(id)) {
+    ui.toast('强化选择无效');
+    return;
+  }
   proceedToNextRound();
 };
 
