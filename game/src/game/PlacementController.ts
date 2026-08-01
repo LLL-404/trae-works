@@ -49,7 +49,7 @@ export class PlacementController {
    */
   selectBenchUnit(benchIndex: number): boolean {
     const unit = this.state.bench[benchIndex];
-    if (!unit) return false;
+    if (!unit) { return false; }
     this.clearSelectionHighlight();
     this.selectedUnitId = unit.id;
     this.source = 'bench';
@@ -66,7 +66,7 @@ export class PlacementController {
    */
   selectBoardUnit(col: number, row: number): boolean {
     const unit = this.state.board[col]?.[row];
-    if (!unit || unit.team !== 'player') return false;
+    if (!unit || unit.team !== 'player') { return false; }
     this.clearSelectionHighlight();
     this.selectedUnitId = unit.id;
     this.source = 'board';
@@ -103,19 +103,19 @@ export class PlacementController {
   placeSelected(col: number, row: number): boolean {
     const id = this.selectedUnitId;
     const source = this.source;
-    if (!id || source === null) return false;
+    if (!id || source === null) { return false; }
 
     // 仅允许放置在玩家区
-    if (row !== 0 && row !== 1) return false;
+    if (row !== 0 && row !== 1) { return false; }
     // 边界校验
-    if (col < 0 || col >= BOARD_COLS) return false;
-    if (row < 0 || row >= BOARD_ROWS) return false;
+    if (col < 0 || col >= BOARD_COLS) { return false; }
+    if (row < 0 || row >= BOARD_ROWS) { return false; }
     // 目标格子必须为空
-    if (this.state.board[col][row] !== null) return false;
+    if (this.state.board[col][row] !== null) { return false; }
 
     if (source === 'bench') {
       const unit = this.state.bench[this.benchIndex];
-      if (!unit) return false;
+      if (!unit) { return false; }
       this.state.removeFromBench(this.benchIndex);
       this.state.placeUnitOnBoard(unit, col, row);
       this.unitRenderer.placeUnit(unit);
@@ -138,9 +138,9 @@ export class PlacementController {
    */
   recallFromBoard(col: number, row: number): boolean {
     const unit = this.state.board[col]?.[row];
-    if (!unit || unit.team !== 'player') return false;
+    if (!unit || unit.team !== 'player') { return false; }
     // 备战区需有空位
-    if (this.state.bench.indexOf(null) < 0) return false;
+    if (this.state.bench.indexOf(null) < 0) { return false; }
 
     this.state.removeUnitFromBoard(col, row);
     this.state.addToBench(unit);

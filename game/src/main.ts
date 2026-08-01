@@ -12,7 +12,7 @@ import { RogueProgression } from './game/RogueProgression';
 import { UI } from './ui/UI';
 import { UNIT_DEFINITIONS } from './data/units';
 import { BOARD_COLS, BOARD_ROWS } from './types';
-import type { UnitStats } from './types';
+import type { AugmentId, UnitStats } from './types';
 import './style.css';
 
 // ===== 场景 / 相机 / 渲染器 =====
@@ -97,7 +97,7 @@ function countPlayerUnits(): number {
   let n = 0;
   for (const column of state.board) {
     for (const u of column) {
-      if (u) n++;
+      if (u) { n++; }
     }
   }
   return n;
@@ -146,7 +146,7 @@ ui.onRecall = (col: number, row: number) => {
   }
 };
 
-ui.onChooseAugment = (id) => {
+ui.onChooseAugment = (id: AugmentId) => {
   // 防御性检查：choose 失败（id 不在待选中）时不推进回合，避免跳过强化
   if (!augmentSystem.choose(id)) {
     ui.toast('强化选择无效');
@@ -484,7 +484,7 @@ if (import.meta.env.DEV) {
       let n = 0;
       for (const column of state.board) {
         for (const u of column) {
-          if (u) n++;
+          if (u) { n++; }
         }
       }
       return n;

@@ -99,42 +99,42 @@ describe('AugmentSystem', () => {
     };
 
     it('AtkBoost: attack *= 1.2', () => {
-      const result = aug.applyStatAugments(baseStats, [AugmentId.AtkBoost]);
+      const result = aug.applyStatAugments(baseStats, [AugmentId.ATK_BOOST]);
       expect(result.attack).toBeCloseTo(20 * 1.2, 10);
     });
 
     it('HpBoost: hp *= 1.25', () => {
-      const result = aug.applyStatAugments(baseStats, [AugmentId.HpBoost]);
+      const result = aug.applyStatAugments(baseStats, [AugmentId.HP_BOOST]);
       expect(result.hp).toBeCloseTo(100 * 1.25, 10);
     });
 
     it('AtkSpeedBoost: attackSpeed *= 1.25', () => {
-      const result = aug.applyStatAugments(baseStats, [AugmentId.AtkSpeedBoost]);
+      const result = aug.applyStatAugments(baseStats, [AugmentId.ATK_SPEED_BOOST]);
       expect(result.attackSpeed).toBeCloseTo(1.0 * 1.25, 10);
     });
 
     it('MoveBoost: moveSpeed *= 1.3', () => {
-      const result = aug.applyStatAugments(baseStats, [AugmentId.MoveBoost]);
+      const result = aug.applyStatAugments(baseStats, [AugmentId.MOVE_BOOST]);
       expect(result.moveSpeed).toBeCloseTo(2.0 * 1.3, 10);
     });
 
     it('RangeBoost: range += 1', () => {
-      const result = aug.applyStatAugments(baseStats, [AugmentId.RangeBoost]);
+      const result = aug.applyStatAugments(baseStats, [AugmentId.RANGE_BOOST]);
       expect(result.range).toBe(3.0 + 1);
     });
 
     it('GoldIncome: stats 不变', () => {
-      const result = aug.applyStatAugments(baseStats, [AugmentId.GoldIncome]);
+      const result = aug.applyStatAugments(baseStats, [AugmentId.GOLD_INCOME]);
       expect(result).toEqual(baseStats);
     });
 
     it('多个强化叠加：同时应用所有强化', () => {
       const result = aug.applyStatAugments(baseStats, [
-        AugmentId.AtkBoost,
-        AugmentId.HpBoost,
-        AugmentId.AtkSpeedBoost,
-        AugmentId.MoveBoost,
-        AugmentId.RangeBoost,
+        AugmentId.ATK_BOOST,
+        AugmentId.HP_BOOST,
+        AugmentId.ATK_SPEED_BOOST,
+        AugmentId.MOVE_BOOST,
+        AugmentId.RANGE_BOOST,
       ]);
       expect(result.attack).toBeCloseTo(20 * 1.2, 10);
       expect(result.hp).toBeCloseTo(100 * 1.25, 10);
@@ -145,19 +145,19 @@ describe('AugmentSystem', () => {
 
     it('不修改原 stats 对象（返回新对象）', () => {
       const original: UnitStats = { ...baseStats };
-      aug.applyStatAugments(baseStats, [AugmentId.AtkBoost, AugmentId.HpBoost]);
+      aug.applyStatAugments(baseStats, [AugmentId.ATK_BOOST, AugmentId.HP_BOOST]);
       expect(baseStats).toEqual(original);
     });
   });
 
   describe('hasAugment', () => {
     it('已添加返回 true', () => {
-      state.addAugment(AugmentId.AtkBoost);
-      expect(aug.hasAugment(AugmentId.AtkBoost)).toBe(true);
+      state.addAugment(AugmentId.ATK_BOOST);
+      expect(aug.hasAugment(AugmentId.ATK_BOOST)).toBe(true);
     });
 
     it('未添加返回 false', () => {
-      expect(aug.hasAugment(AugmentId.AtkBoost)).toBe(false);
+      expect(aug.hasAugment(AugmentId.ATK_BOOST)).toBe(false);
     });
   });
 });

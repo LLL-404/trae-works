@@ -56,7 +56,7 @@ export class AugmentSystem {
    */
   choose(id: AugmentId): boolean {
     const found = this.state.pendingAugmentChoices.find((a) => a.id === id);
-    if (!found) return false;
+    if (!found) { return false; }
     // 先清空待选，再 addAugment（其内部 notify 的快照将同时反映已清空待选与新强化）
     this.state.pendingAugmentChoices = [];
     this.state.addAugment(id);
@@ -76,22 +76,22 @@ export class AugmentSystem {
     const result: UnitStats = { ...stats };
     for (const id of augments) {
       switch (id) {
-        case AugmentId.AtkBoost:
+        case AugmentId.ATK_BOOST:
           result.attack *= 1.2;
           break;
-        case AugmentId.HpBoost:
+        case AugmentId.HP_BOOST:
           result.hp *= 1.25;
           break;
-        case AugmentId.AtkSpeedBoost:
+        case AugmentId.ATK_SPEED_BOOST:
           result.attackSpeed *= 1.25;
           break;
-        case AugmentId.MoveBoost:
+        case AugmentId.MOVE_BOOST:
           result.moveSpeed *= 1.3;
           break;
-        case AugmentId.RangeBoost:
+        case AugmentId.RANGE_BOOST:
           result.range += 1;
           break;
-        case AugmentId.GoldIncome:
+        case AugmentId.GOLD_INCOME:
           // 经济类强化：不影响 stats，由 EconomySystem 处理
           break;
       }

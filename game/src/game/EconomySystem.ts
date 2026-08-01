@@ -39,7 +39,7 @@ export class EconomySystem {
     const safeGold = Number.isFinite(currentGold) && currentGold > 0 ? currentGold : 0;
     const base = 5 + safeRound;
     const interest = Math.min(5, Math.floor(safeGold / 10));
-    const augmentBonus = augments.includes(AugmentId.GoldIncome) ? 2 : 0;
+    const augmentBonus = augments.includes(AugmentId.GOLD_INCOME) ? 2 : 0;
     const total = base + interest + augmentBonus;
     return { base, interest, augmentBonus, total };
   }

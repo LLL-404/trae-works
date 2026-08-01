@@ -81,7 +81,7 @@ describe('GameState', () => {
 
     it('showAugmentChoices 设置选项并切到 augment 阶段', () => {
       const choices: HexAugment[] = [
-        { id: AugmentId.AtkBoost, name: '攻击强化', description: 'd', kind: 'stat' },
+        { id: AugmentId.ATK_BOOST, name: '攻击强化', description: 'd', kind: 'stat' },
       ];
       state.showAugmentChoices(choices);
       expect(state.phase).toBe('augment');
@@ -114,7 +114,7 @@ describe('GameState', () => {
       // 修改快照的各类字段，原状态应保持不变
       received!.gold = 9999;
       received!.phase = 'gameover';
-      received!.augments.push(AugmentId.AtkBoost);
+      received!.augments.push(AugmentId.ATK_BOOST);
       received!.shop[0].sold = true;
       received!.board[0][0] = createPlayerUnit();
 
@@ -394,10 +394,10 @@ describe('GameState', () => {
 
   describe('addAugment', () => {
     it('添加到 augments 数组', () => {
-      state.addAugment(AugmentId.AtkBoost);
-      expect(state.augments).toEqual([AugmentId.AtkBoost]);
-      state.addAugment(AugmentId.GoldIncome);
-      expect(state.augments).toEqual([AugmentId.AtkBoost, AugmentId.GoldIncome]);
+      state.addAugment(AugmentId.ATK_BOOST);
+      expect(state.augments).toEqual([AugmentId.ATK_BOOST]);
+      state.addAugment(AugmentId.GOLD_INCOME);
+      expect(state.augments).toEqual([AugmentId.ATK_BOOST, AugmentId.GOLD_INCOME]);
     });
   });
 
@@ -412,9 +412,9 @@ describe('GameState', () => {
       state.buyFromShop(0);
       state.addToBench(createPlayerUnit());
       state.placeUnitOnBoard(createPlayerUnit(), 0, 0);
-      state.addAugment(AugmentId.AtkBoost);
+      state.addAugment(AugmentId.ATK_BOOST);
       state.showAugmentChoices([
-        { id: AugmentId.HpBoost, name: 'n', description: 'd', kind: 'stat' },
+        { id: AugmentId.HP_BOOST, name: 'n', description: 'd', kind: 'stat' },
       ]);
 
       state.reset();
@@ -446,7 +446,7 @@ describe('GameState', () => {
       // 修改快照各层字段
       snap.gold = 0;
       snap.playerHp = 1;
-      snap.augments.push(AugmentId.GoldIncome);
+      snap.augments.push(AugmentId.GOLD_INCOME);
       snap.board[0][0] = null;
       snap.shop[0].sold = true;
       snap.bench[0] = createPlayerUnit();

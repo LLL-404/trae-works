@@ -82,9 +82,9 @@ export class BattleSystem {
 
     // 每个存活单位行动
     for (const unit of this.activeUnits) {
-      if (unit.currentHp <= 0) continue;
+      if (unit.currentHp <= 0) { continue; }
       const target = this.findNearestEnemy(unit);
-      if (!target) continue; // 无敌方存活，等待结束判定
+      if (!target) { continue; } // 无敌方存活，等待结束判定
 
       const dx = target.col - unit.col;
       const dy = target.row - unit.row;
@@ -170,11 +170,11 @@ export class BattleSystem {
 
   /** 返回战斗已用时间比例（0-1），未运行时返回 0 */
   getElapsedRatio(): number {
-    if (!this.isRunning) return 0;
+    if (!this.isRunning) { return 0; }
     const elapsed = performance.now() - this.battleStartTime;
     const ratio = elapsed / BATTLE_TIMEOUT_MS;
-    if (ratio < 0) return 0;
-    if (ratio > 1) return 1;
+    if (ratio < 0) { return 0; }
+    if (ratio > 1) { return 1; }
     return ratio;
   }
 
@@ -193,8 +193,8 @@ export class BattleSystem {
     let nearest: Unit | null = null;
     let nearestDist = Infinity;
     for (const other of this.activeUnits) {
-      if (other.team === unit.team) continue;
-      if (other.currentHp <= 0) continue;
+      if (other.team === unit.team) { continue; }
+      if (other.currentHp <= 0) { continue; }
       const dx = other.col - unit.col;
       const dy = other.row - unit.row;
       const dist = Math.sqrt(dx * dx + dy * dy);

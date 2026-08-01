@@ -65,12 +65,12 @@ export interface ShopSlot {
 
 /** 海克斯科技强化 ID */
 export enum AugmentId {
-  AtkBoost = 'atkBoost',
-  HpBoost = 'hpBoost',
-  AtkSpeedBoost = 'atkSpeedBoost',
-  GoldIncome = 'goldIncome',
-  MoveBoost = 'moveBoost',
-  RangeBoost = 'rangeBoost',
+  ATK_BOOST = 'atkBoost',
+  HP_BOOST = 'hpBoost',
+  ATK_SPEED_BOOST = 'atkSpeedBoost',
+  GOLD_INCOME = 'goldIncome',
+  MOVE_BOOST = 'moveBoost',
+  RANGE_BOOST = 'rangeBoost',
 }
 
 /** 海克斯强化种类 */

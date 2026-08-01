@@ -58,7 +58,7 @@ export class GameState implements GameStateModel {
     this.listeners.push(listener);
     return () => {
       const idx = this.listeners.indexOf(listener);
-      if (idx >= 0) this.listeners.splice(idx, 1);
+      if (idx >= 0) { this.listeners.splice(idx, 1); }
     };
   }
 
@@ -102,22 +102,22 @@ export class GameState implements GameStateModel {
   // ===== 操作方法 =====
 
   addGold(amount: number): void {
-    if (!Number.isFinite(amount) || amount === 0) return;
+    if (!Number.isFinite(amount) || amount === 0) { return; }
     this.gold = Math.max(0, this.gold + amount);
     this.notify();
   }
 
   /** 消费金币，不足或非法金额返回 false 且不变更状态 */
   spendGold(amount: number): boolean {
-    if (!Number.isFinite(amount) || amount < 0) return false;
-    if (this.gold < amount) return false;
+    if (!Number.isFinite(amount) || amount < 0) { return false; }
+    if (this.gold < amount) { return false; }
     this.gold -= amount;
     this.notify();
     return true;
   }
 
   damagePlayer(amount: number): void {
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (!Number.isFinite(amount) || amount <= 0) { return; }
     this.playerHp = Math.max(0, this.playerHp - amount);
     this.notify();
   }
@@ -135,7 +135,7 @@ export class GameState implements GameStateModel {
   }
 
   placeUnitOnBoard(unit: Unit, col: number, row: number): void {
-    if (!this.isInsideBoard(col, row)) return;
+    if (!this.isInsideBoard(col, row)) { return; }
     this.board[col][row] = unit;
     unit.col = col;
     unit.row = row;
@@ -143,7 +143,7 @@ export class GameState implements GameStateModel {
   }
 
   removeUnitFromBoard(col: number, row: number): void {
-    if (!this.isInsideBoard(col, row)) return;
+    if (!this.isInsideBoard(col, row)) { return; }
     const u = this.board[col][row];
     this.board[col][row] = null;
     if (u) {
@@ -159,10 +159,10 @@ export class GameState implements GameStateModel {
     toCol: number,
     toRow: number,
   ): void {
-    if (!this.isInsideBoard(fromCol, fromRow)) return;
-    if (!this.isInsideBoard(toCol, toRow)) return;
+    if (!this.isInsideBoard(fromCol, fromRow)) { return; }
+    if (!this.isInsideBoard(toCol, toRow)) { return; }
     const u = this.board[fromCol][fromRow];
-    if (!u) return; // 源格子无单位，无操作
+    if (!u) { return; } // 源格子无单位，无操作
     this.board[fromCol][fromRow] = null;
     this.board[toCol][toRow] = u;
     u.col = toCol;
@@ -173,7 +173,7 @@ export class GameState implements GameStateModel {
   /** 加入备战区，满则返回 false */
   addToBench(unit: Unit): boolean {
     const idx = this.bench.indexOf(null);
-    if (idx < 0) return false;
+    if (idx < 0) { return false; }
     this.bench[idx] = unit;
     unit.col = -1;
     unit.row = -1;
@@ -182,7 +182,7 @@ export class GameState implements GameStateModel {
   }
 
   removeFromBench(index: number): void {
-    if (index < 0 || index >= this.bench.length) return;
+    if (index < 0 || index >= this.bench.length) { return; }
     const u = this.bench[index];
     this.bench[index] = null;
     if (u) {
@@ -203,7 +203,7 @@ export class GameState implements GameStateModel {
   /** 购买商店槽位，返回该槽快照；不可购买返回 null */
   buyFromShop(index: number): ShopSlot | null {
     const slot = this.shop[index];
-    if (!slot || slot.sold || slot.unitType === null) return null;
+    if (!slot || slot.sold || slot.unitType === null) { return null; }
     slot.sold = true;
     this.notify();
     return { ...slot };

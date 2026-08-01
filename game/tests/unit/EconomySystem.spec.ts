@@ -32,13 +32,13 @@ describe('EconomySystem', () => {
     });
 
     it('GoldIncome 强化 +2', () => {
-      const r = economy.computeIncome(1, 0, [AugmentId.GoldIncome]);
+      const r = economy.computeIncome(1, 0, [AugmentId.GOLD_INCOME]);
       expect(r.augmentBonus).toBe(2);
       expect(r.total).toBe(8); // base 6 + interest 0 + augmentBonus 2
     });
 
     it('无 GoldIncome 强化时 augmentBonus=0', () => {
-      const r = economy.computeIncome(1, 0, [AugmentId.AtkBoost, AugmentId.HpBoost]);
+      const r = economy.computeIncome(1, 0, [AugmentId.ATK_BOOST, AugmentId.HP_BOOST]);
       expect(r.augmentBonus).toBe(0);
       expect(r.total).toBe(6);
     });
@@ -63,7 +63,7 @@ describe('EconomySystem', () => {
 
     it('利息 + 强化 + base 同时生效', () => {
       // round=3 -> base=8, gold=30 -> interest=3, GoldIncome -> +2
-      const r = economy.computeIncome(3, 30, [AugmentId.GoldIncome]);
+      const r = economy.computeIncome(3, 30, [AugmentId.GOLD_INCOME]);
       expect(r.base).toBe(8);
       expect(r.interest).toBe(3);
       expect(r.augmentBonus).toBe(2);
@@ -80,7 +80,7 @@ describe('EconomySystem', () => {
     });
 
     it('含 GoldIncome 强化时 total 包含 +2', () => {
-      const r = economy.grantIncome(1, [AugmentId.GoldIncome]);
+      const r = economy.grantIncome(1, [AugmentId.GOLD_INCOME]);
       expect(r.total).toBe(8);
       expect(state.gold).toBe(13); // 5 + 8
     });

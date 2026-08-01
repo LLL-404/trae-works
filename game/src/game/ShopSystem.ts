@@ -35,8 +35,8 @@ export class ShopSystem {
    * 失败（金币不足、槽位无效、备战区满）时返回 null 并保证金币不丢失。
    */
   buy(index: number): Unit | null {
-    if (this.state.gold < UNIT_COST) return null;
-    if (!this.state.spendGold(UNIT_COST)) return null;
+    if (this.state.gold < UNIT_COST) { return null; }
+    if (!this.state.spendGold(UNIT_COST)) { return null; }
 
     const slot = this.state.buyFromShop(index);
     if (!slot || slot.unitType === null) {
@@ -76,8 +76,8 @@ export class ShopSystem {
    * 花费 REFRESH_COST 刷新商店。金币不足返回 false。
    */
   refresh(): boolean {
-    if (this.state.gold < REFRESH_COST) return false;
-    if (!this.state.spendGold(REFRESH_COST)) return false;
+    if (this.state.gold < REFRESH_COST) { return false; }
+    if (!this.state.spendGold(REFRESH_COST)) { return false; }
     this.populateShop();
     return true;
   }

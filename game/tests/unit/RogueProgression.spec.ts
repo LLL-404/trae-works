@@ -182,8 +182,8 @@ describe('RogueProgression', () => {
       state.phase = 'gameover';
       state.playerHp = 30;
       state.gold = 100;
-      state.augments.push(AugmentId.AtkBoost);
-      state.augments.push(AugmentId.HpBoost);
+      state.augments.push(AugmentId.ATK_BOOST);
+      state.augments.push(AugmentId.HP_BOOST);
 
       prog.startNewRun();
 

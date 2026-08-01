@@ -26,43 +26,43 @@ export interface AugmentDefinition extends HexAugment {
  * 海克斯科技强化库（至少 6 种）。
  */
 export const AUGMENT_DEFINITIONS: Record<AugmentId, AugmentDefinition> = {
-  [AugmentId.AtkBoost]: {
-    id: AugmentId.AtkBoost,
+  [AugmentId.ATK_BOOST]: {
+    id: AugmentId.ATK_BOOST,
     name: '锋刃',
     description: '所有单位攻击力 +20%',
     kind: 'stat',
     effect: { attackMult: 1.2 },
   },
-  [AugmentId.HpBoost]: {
-    id: AugmentId.HpBoost,
+  [AugmentId.HP_BOOST]: {
+    id: AugmentId.HP_BOOST,
     name: '韧性',
     description: '所有单位生命值 +25%',
     kind: 'stat',
     effect: { hpMult: 1.25 },
   },
-  [AugmentId.AtkSpeedBoost]: {
-    id: AugmentId.AtkSpeedBoost,
+  [AugmentId.ATK_SPEED_BOOST]: {
+    id: AugmentId.ATK_SPEED_BOOST,
     name: '急速',
     description: '所有单位攻击速度 +25%',
     kind: 'stat',
     effect: { attackSpeedMult: 1.25 },
   },
-  [AugmentId.GoldIncome]: {
-    id: AugmentId.GoldIncome,
+  [AugmentId.GOLD_INCOME]: {
+    id: AugmentId.GOLD_INCOME,
     name: '财源',
     description: '每回合额外获得 +2 金币',
     kind: 'economy',
     effect: { goldIncomeBonus: 2 },
   },
-  [AugmentId.MoveBoost]: {
-    id: AugmentId.MoveBoost,
+  [AugmentId.MOVE_BOOST]: {
+    id: AugmentId.MOVE_BOOST,
     name: '疾风',
     description: '所有单位移动速度 +30%',
     kind: 'stat',
     effect: { moveSpeedMult: 1.3 },
   },
-  [AugmentId.RangeBoost]: {
-    id: AugmentId.RangeBoost,
+  [AugmentId.RANGE_BOOST]: {
+    id: AugmentId.RANGE_BOOST,
     name: '远视',
     description: '所有单位攻击范围 +1 格',
     kind: 'stat',

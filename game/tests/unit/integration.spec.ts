@@ -202,22 +202,22 @@ describe('集成测试', () => {
     // 根据所选强化类型验证对应属性已被修改
     // 注意：GoldIncome 为经济类强化，不影响单位 stats
     switch (chosen.id) {
-      case AugmentId.AtkBoost:
+      case AugmentId.ATK_BOOST:
         expect(augmentedStats.attack).toBeCloseTo(20 * 1.2, 10);
         break;
-      case AugmentId.HpBoost:
+      case AugmentId.HP_BOOST:
         expect(augmentedStats.hp).toBeCloseTo(100 * 1.25, 10);
         break;
-      case AugmentId.AtkSpeedBoost:
+      case AugmentId.ATK_SPEED_BOOST:
         expect(augmentedStats.attackSpeed).toBeCloseTo(1.0 * 1.25, 10);
         break;
-      case AugmentId.MoveBoost:
+      case AugmentId.MOVE_BOOST:
         expect(augmentedStats.moveSpeed).toBeCloseTo(2.0 * 1.3, 10);
         break;
-      case AugmentId.RangeBoost:
+      case AugmentId.RANGE_BOOST:
         expect(augmentedStats.range).toBe(3.0 + 1);
         break;
-      case AugmentId.GoldIncome:
+      case AugmentId.GOLD_INCOME:
         // 经济类强化不影响 stats
         expect(augmentedStats).toEqual(baseStats);
         break;
@@ -324,8 +324,8 @@ describe('集成测试', () => {
     state.round = 3;
     state.playerHp = 50;
     state.gold = 20;
-    state.addAugment(AugmentId.AtkBoost);
-    state.addAugment(AugmentId.HpBoost);
+    state.addAugment(AugmentId.ATK_BOOST);
+    state.addAugment(AugmentId.HP_BOOST);
     shopSystem.populateShop();
     shopSystem.buy(0); // 购买单位到备战区
     // 棋盘上放置单位
