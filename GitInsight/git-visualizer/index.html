@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GitInsight — Git 代码贡献可视化分析器</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+        </svg>
+        <span>GitInsight</span>
+      </div>
+      <span class="subtitle">Git 代码贡献可视化分析器</span>
+    </div>
+    <div class="header-right">
+      <span class="badge">Powered by TRAE SOLO</span>
+      <button id="exportBtn" class="btn-export hidden" title="导出报告">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        导出报告
+      </button>
+    </div>
+  </header>
+
+  <!-- 主体 -->
+  <div class="app-layout">
+    <!-- 输入区 -->
+    <section id="inputSection" class="input-section">
+      <!-- 功能介绍 -->
+      <div class="feature-intro">
+        <div class="feature-item">
+          <div class="feature-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+              <polyline points="13 2 13 9 20 9"/>
+            </svg>
+          </div>
+          <div class="feature-text">
+            <strong>输入仓库地址</strong>
+            <span>粘贴 GitHub 公开仓库链接</span>
+          </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature-item">
+          <div class="feature-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <div class="feature-text">
+            <strong>自动分析</strong>
+            <span>智能解析提交数据与代码变更</span>
+          </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature-item">
+          <div class="feature-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+          </div>
+          <div class="feature-text">
+            <strong>可视化报告</strong>
+            <span>多维度图表与贡献者洞察</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 主入口：仓库地址 -->
+      <div class="input-card">
+        <h2 class="input-title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+          </svg>
+          输入 GitHub 仓库地址
+        </h2>
+        <p class="input-desc">
+          输入公开仓库地址，自动获取提交数据并生成可视化报告：
+        </p>
+        <div class="repo-input-row">
+          <input type="text" id="repoInput" class="repo-input" placeholder="https://github.com/vuejs/vue" />
+          <button id="fetchBtn" class="btn-primary" style="flex:none;width:auto;padding:12px 24px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            分析
+          </button>
+        </div>
+        <div class="input-examples">
+          <span class="examples-label">试试看：</span>
+          <button class="example-btn" data-repo="https://github.com/vuejs/vue">vuejs/vue</button>
+          <button class="example-btn" data-repo="https://github.com/facebook/react">facebook/react</button>
+          <button class="example-btn" data-repo="https://github.com/torvalds/linux">torvalds/linux</button>
+          <button class="example-btn" data-repo="https://github.com/microsoft/vscode">microsoft/vscode</button>
+        </div>
+      </div>
+
+      <!-- 备选：手动粘贴 -->
+      <div class="input-card" style="margin-top: 16px;">
+        <div class="collapse-header" id="collapseToggle">
+          <span>或手动粘贴 Git Log 输出</span>
+          <svg class="collapse-arrow" id="collapseArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+        <div id="collapseBody" class="collapse-body hidden">
+          <p class="input-desc" style="margin-top: 8px;">
+            在终端运行以下命令，将输出粘贴到下方：
+          </p>
+          <div class="cmd-block">
+            <code>git log --all --pretty=format:"%H|%an|%ae|%aI|%s" --shortstat</code>
+            <button class="copy-btn" onclick="copyCommand()">复制</button>
+          </div>
+          <textarea id="gitLogInput" placeholder="将 git log 输出粘贴到这里..." rows="4"></textarea>
+          <div class="input-actions">
+            <button id="analyzeBtn" class="btn-primary" style="flex:none;width:auto;padding:10px 20px;">
+              开始分析
+            </button>
+            <button id="demoBtn" class="btn-secondary" style="flex:none;padding:10px 20px;">
+              示例数据
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 分析结果区 -->
+    <section id="resultSection" class="result-section hidden">
+
+      <!-- 仓库信息摘要栏 -->
+      <div id="repoSummary" class="repo-summary">
+        <div class="repo-summary-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+          </svg>
+          <span id="repoName" class="repo-name">--</span>
+        </div>
+        <div class="repo-summary-stats">
+          <span id="summaryRange" class="summary-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>--</span>
+          </span>
+          <span id="summaryCommits" class="summary-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>--</span>
+          </span>
+          <span id="summaryContrib" class="summary-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>--</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 概览统计卡片 (8个) -->
+      <div class="stats-grid">
+        <div class="stat-card" data-color="#58a6ff">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(88,166,255,0.12);color:#58a6ff;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </div>
+            <div class="stat-value" id="totalCommits">0</div>
+            <div class="stat-label">总提交数</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#bc8cff">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(188,140,255,0.12);color:#bc8cff;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="stat-value" id="totalAuthors">0</div>
+            <div class="stat-label">贡献者</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#3fb950">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(63,185,80,0.12);color:#3fb950;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="stat-value" id="totalDays">0</div>
+            <div class="stat-label">活跃天数</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#d29922">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(210,153,34,0.12);color:#d29922;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div class="stat-value" id="avgPerDay">0</div>
+            <div class="stat-label">日均提交</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#3fb950">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(63,185,80,0.12);color:#3fb950;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            </div>
+            <div class="stat-value" id="totalAdditions">0</div>
+            <div class="stat-label">新增行数</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#f85149">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(248,81,73,0.12);color:#f85149;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+            </div>
+            <div class="stat-value" id="totalDeletions">0</div>
+            <div class="stat-label">删除行数</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#79c0ff">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(121,192,255,0.12);color:#79c0ff;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            </div>
+            <div class="stat-value" id="totalFiles">0</div>
+            <div class="stat-label">涉及文件数</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="#f778ba">
+          <div class="stat-accent"></div>
+          <div class="stat-content">
+            <div class="stat-icon-wrap" style="background:rgba(247,120,186,0.12);color:#f778ba;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="stat-value" id="projectDuration">0</div>
+            <div class="stat-label">项目持续时间</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 贡献热力图 -->
+      <div class="chart-card fade-in-up">
+        <h3 class="chart-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          贡献热力图
+        </h3>
+        <div class="heatmap-container">
+          <canvas id="heatmapCanvas"></canvas>
+        </div>
+        <div class="heatmap-legend">
+          <span>少</span>
+          <div class="legend-blocks">
+            <span class="legend-block level-0"></span>
+            <span class="legend-block level-1"></span>
+            <span class="legend-block level-2"></span>
+            <span class="legend-block level-3"></span>
+            <span class="legend-block level-4"></span>
+          </div>
+          <span>多</span>
+        </div>
+      </div>
+
+      <!-- 提交类型分布 + 月度活跃度 -->
+      <div class="chart-row">
+        <div class="chart-card fade-in-up">
+          <h3 class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            提交类型分布
+          </h3>
+          <div class="chart-wrapper chart-wrapper-square">
+            <canvas id="typeChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card fade-in-up">
+          <h3 class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            月度活跃度
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 代码行数趋势 -->
+      <div class="chart-card fade-in-up">
+        <h3 class="chart-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          代码行数趋势
+        </h3>
+        <div class="chart-wrapper chart-wrapper-wide">
+          <canvas id="codeTrendChart"></canvas>
+        </div>
+      </div>
+
+      <!-- 贡献者详情卡片 -->
+      <div class="chart-card fade-in-up">
+        <h3 class="chart-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          贡献者详情
+        </h3>
+        <div id="contributorCards" class="contributor-cards"></div>
+      </div>
+
+      <!-- 提交趋势按周 + 贡献者排行榜 -->
+      <div class="chart-row">
+        <div class="chart-card fade-in-up">
+          <h3 class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            提交趋势（按周）
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card fade-in-up">
+          <h3 class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            贡献者排行榜
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="authorChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 提交时间分布 + 星期贡献分布 -->
+      <div class="chart-row">
+        <div class="chart-card fade-in-up">
+          <h3 class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            提交时间分布
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="timeChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card fade-in-up">
+          <h3 class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            星期贡献分布
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="weekdayChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最近提交记录 -->
+      <div class="chart-card fade-in-up">
+        <h3 class="chart-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          最近提交记录
+        </h3>
+        <div id="commitList" class="commit-list"></div>
+      </div>
+
+      <!-- 返回按钮 -->
+      <div class="back-section">
+        <button id="backBtn" class="btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          返回重新分析
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>
