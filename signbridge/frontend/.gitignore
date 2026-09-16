@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Playwright 测试产物
+test-results/
+playwright-report/
+
+# Lighthouse 审计产物
+lighthouse-result.json
+lighthouse-mobile-*.json
+
+# tfjs-node 原生模块构建缓存
+.cache/
+
+# 测试覆盖率产物
+coverage/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

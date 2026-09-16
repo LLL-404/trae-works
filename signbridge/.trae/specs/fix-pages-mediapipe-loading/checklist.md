@@ -1,0 +1,26 @@
+# Checklist
+
+- [x] 浏览器 wasm 截断根因已确认（缓存层 or 网络层）— Service Worker `mediapipe-cache`（CacheFirst）缓存了 jsdelivr CDN 截断版本
+- [x] Service Worker 缓存策略已修正，不会缓存截断文件 — CacheFirst 改为 NetworkFirst + networkTimeoutSeconds: 30
+- [x] `pose_landmarker_full.task` 已自托管于 `public/mediapipe/models/`（9,398,198 bytes）
+- [x] `hand_landmarker.task` 已自托管于 `public/mediapipe/models/`（7,819,105 bytes）
+- [x] `config.ts` 新增 `poseModelUrl` 和 `handModelUrl` 配置项
+- [x] `PoseEstimator.ts` 无硬编码 `storage.googleapis.com` URL
+- [x] `STGCNRecognizer.ts` 无硬编码 `storage.googleapis.com` URL
+- [x] 全局搜索确认无残留 `storage.googleapis.com` 硬编码
+- [x] 全局搜索确认无残留 `cdn.jsdelivr.net` 硬编码（vite.config.ts runtimeCaching 配置除外）
+- [x] `index.html` CSP `connect-src` 不包含 `cdn.jsdelivr.net`
+- [x] `index.html` CSP `connect-src` 不包含 `storage.googleapis.com`
+- [x] `index.html` CSP `connect-src` 包含 `'self'`
+- [x] `.env.example` 已新增 `VITE_POSE_MODEL_URL` 和 `VITE_HAND_MODEL_URL` 说明
+- [x] `CHANGELOG.md` 已记录本次修复
+- [x] 本地 `tsc` 退出码 0
+- [x] 本地 `lint` 0 errors（10 个预先存在 warnings，本次未引入新 warning）
+- [x] 本地 `build` 成功，`dist/mediapipe/models/` 包含全部模型文件（3 个 task 文件）
+- [ ] commit 已 push（3044aeb），GitHub Pages 部署成功（Run ID 29850397128）
+- [ ] GitHub Pages `/signbridge/voice-to-sign` 页面可达（200 OK + SPA 重定向），avatar 静态资源完整
+- [ ] GitHub Pages `/signbridge/sign-to-text` 页面可达，wasm 文件完整（11,153,617 bytes），CSP 允许自托管
+- [ ] GitHub Pages `/signbridge/dialogue` 页面可达（SPA 重定向）
+- [ ] GitHub Pages `/signbridge/learning` 页面可达（SPA 重定向）
+- [ ] 新增模型文件部署验证：pose_landmarker_full.task（9,398,198 bytes 200 OK）、hand_landmarker.task（7,819,105 bytes 200 OK）
+- [ ] CSP 部署验证：connect-src 'self' blob: data:;（cdn.jsdelivr.net 和 storage.googleapis.com 已移除）
