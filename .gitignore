@@ -3,3 +3,13 @@ Thumbs.db
 *.log
 node_modules/
 .env
+
+# 本地工具与镜像（不入库）
+Rufus/
+rufus-4.14p.exe
+rufus.ini
+kali-linux-*.iso
+platform-tools/
+platform-tools-latest-windows.zip
+mtkclient/
+WiFiTool/

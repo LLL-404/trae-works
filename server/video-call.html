@@ -589,6 +589,35 @@
         // 自建服务器的路径（需与服务器端 server.js 中的 path 配置一致）
         const CUSTOM_PEER_PATH = '/myapp';
 
+        // ===== WebRTC ICE 服务器配置 =====
+        // 统一管理所有 WebRTC 连接的 STUN/TURN 服务器
+        // STUN 服务器：用于 NAT 穿透，帮助发现公网 IP
+        // TURN 服务器：用于对称 NAT 穿透，提供中继服务
+        const ICE_SERVERS = [
+            // 阿里云 STUN 服务器（国内首选，延迟最低）
+            { urls: 'stun:stun.aliyun.com:3478' },
+            // 国内可达的 STUN 服务器
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:stun.miwifi.com:3478' },
+            { urls: 'stun:stun.schlund.de:3478' },
+            // 免费公共 TURN 服务器（Open Relay Project，用于对称 NAT 穿透）
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            }
+        ];
+
         // ===== 状态变量 =====
 
         // PeerJS 实例，管理 WebRTC 信令连接
@@ -1442,23 +1471,7 @@
          */
         function createMQTTPeerConnection(peerId) {
             const pc = new RTCPeerConnection({
-                iceServers: [
-                    // 阿里云 STUN 服务器（国内首选，延迟最低）
-                    { urls: 'stun:stun.aliyun.com:3478' },
-                    { urls: 'stun:stun.cloudflare.com:3478' },
-                    { urls: 'stun:stun.miwifi.com:3478' },
-                    { urls: 'stun:stun.schlund.de:3478' },
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    }
-                ]
+                iceServers: ICE_SERVERS
             });
 
             // 添加本地媒体轨道
@@ -1605,31 +1618,8 @@
                         secure: true
                     } : {}),
                     config: {
-                        iceServers: [
-                            // 阿里云 STUN 服务器（国内首选，延迟最低）
-                            { urls: 'stun:stun.aliyun.com:3478' },
-                            // 国内可达的 STUN 服务器
-                            { urls: 'stun:stun.cloudflare.com:3478' },
-                            { urls: 'stun:stun.miwifi.com:3478' },
-                            { urls: 'stun:stun.schlund.de:3478' },
-                            // 免费公共 TURN 服务器（Open Relay Project，用于对称 NAT 穿透）
-                            {
-                                urls: 'turn:openrelay.metered.ca:80',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            }
-                        ],
-                        iceTransportPolicy: 'all' // 允许所有传输方式（P2P + 中继）
+                        iceServers: ICE_SERVERS,
+                        iceTransportPolicy: 'all'
                     }
                 });
 
@@ -1808,30 +1798,7 @@
                         secure: true
                     } : {}),
                     config: {
-                        iceServers: [
-                            // 阿里云 STUN 服务器（国内首选，延迟最低）
-                            { urls: 'stun:stun.aliyun.com:3478' },
-                            // 国内可达的 STUN 服务器
-                            { urls: 'stun:stun.cloudflare.com:3478' },
-                            { urls: 'stun:stun.miwifi.com:3478' },
-                            { urls: 'stun:stun.schlund.de:3478' },
-                            // 免费公共 TURN 服务器（Open Relay Project，用于对称 NAT 穿透）
-                            {
-                                urls: 'turn:openrelay.metered.ca:80',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            },
-                            {
-                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                                username: 'openrelayproject',
-                                credential: 'openrelayproject'
-                            }
-                        ],
+                        iceServers: ICE_SERVERS,
                         iceTransportPolicy: 'all'
                     }
                 });
